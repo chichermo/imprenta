@@ -32,8 +32,7 @@ export const companyProfile = {
   region: "Quinta Region, Chile",
   positioning:
     "Imprenta comercial y distribuidora de insumos para clinicas, centros de salud y empresas.",
-  status: "Beta operativa abierta",
-  focus: "Validacion visual y funcional antes de conectar Appwrite",
+  specialty: "Salud, imprenta y senaletica",
 };
 
 export const navigationSections: NavSection[] = [
@@ -114,7 +113,7 @@ export const navigationSections: NavSection[] = [
         href: "/facturacion",
         label: "Facturacion",
         shortLabel: "DTE",
-        description: "Preparacion del flujo DTE y cumplimiento tributario chileno.",
+        description: "Documentos tributarios y control DTE para Chile.",
       },
       {
         href: "/reportes",
@@ -132,25 +131,7 @@ export const quickActions = [
   { href: "/cotizaciones", label: "Nueva venta" },
   { href: "/ordenes-trabajo", label: "Produccion" },
   { href: "/compras", label: "Reposicion" },
-  { href: "/facturacion", label: "Ruta DTE" },
-];
-
-export const shellHighlights = [
-  {
-    label: "Modo actual",
-    value: "Sin login",
-    helper: "Primero validamos operacion y luego seguridad.",
-  },
-  {
-    label: "Backend previsto",
-    value: "Appwrite",
-    helper: "Base abierta hoy, integracion despues.",
-  },
-  {
-    label: "Frontend",
-    value: "Next.js",
-    helper: "Responsive ahora, PWA en fase posterior.",
-  },
+  { href: "/facturacion", label: "Facturacion" },
 ];
 
 export const dashboardMetrics: Metric[] = [
@@ -191,49 +172,6 @@ export const commercialFlow: WorkStage[] = [
     name: "Entrega y facturacion",
     summary:
       "El sistema deja lista la entrega y la futura emision DTE para Chile con trazabilidad documental.",
-  },
-];
-
-export const implementationRoadmap = [
-  {
-    phase: "Fase 1",
-    title: "Base comercial",
-    items: [
-      "Clientes, proveedores y catalogo mixto",
-      "Cotizaciones y ordenes de trabajo",
-      "Dashboard responsive",
-      "Base abierta para validar flujo con el negocio",
-    ],
-  },
-  {
-    phase: "Fase 2",
-    title: "Operacion y stock",
-    items: [
-      "Inventario con entradas, salidas y reservas",
-      "Ordenes de compra",
-      "Pagos, cobranzas y reportes",
-      "Permisos por area",
-    ],
-  },
-  {
-    phase: "Fase 3",
-    title: "Facturacion electronica Chile",
-    items: [
-      "Configuracion tributaria y folios",
-      "Emision DTE y seguimiento de estado",
-      "Notas de credito y guias si aplica",
-      "Auditoria XML/PDF",
-    ],
-  },
-  {
-    phase: "Fase 4",
-    title: "Seguridad y acceso",
-    items: [
-      "Login con Appwrite Auth",
-      "Permisos por area y cargo",
-      "Bitacora de accesos",
-      "Preparacion para PWA y uso movil",
-    ],
   },
 ];
 

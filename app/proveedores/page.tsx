@@ -50,7 +50,7 @@ export default function SuppliersPage() {
 
         <SectionCard
           title="Notas de abastecimiento"
-          description="Lineamientos utiles para la fase de compras."
+          description="Criterios para mantener abastecimiento estable y compras mejor coordinadas."
         >
           <ul className="bullet-list">
             {procurementNotes.map((note) => (

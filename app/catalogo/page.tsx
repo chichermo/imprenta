@@ -57,7 +57,7 @@ export default function CatalogPage() {
 
         <SectionCard
           title="Reglas del catalogo"
-          description="Definiciones utiles antes de conectar formularios y persistencia."
+          description="Criterios comerciales para mantener orden de precios, unidades y categorias."
         >
           <ul className="bullet-list">
             {pricingRules.map((rule) => (

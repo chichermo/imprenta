@@ -67,7 +67,7 @@ export default function InventoryPage() {
 
         <SectionCard
           title="Controles clave"
-          description="La idea es sostener operacion diaria sin complejidad innecesaria en la primera fase."
+          description="Buenas practicas para controlar bodega, reservas, consumos y ajustes."
         >
           <ul className="bullet-list">
             {inventoryControls.map((control) => (

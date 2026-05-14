@@ -107,7 +107,7 @@ export default function QuotesPage() {
 
           <SectionCard
             title="Checklist minimo por cotizacion"
-            description="Campos que conviene exigir incluso antes de conectar Appwrite."
+            description="Campos minimos para emitir una oferta clara y lista para seguimiento."
           >
             <ul className="bullet-list">
               {quoteTemplateChecklist.map((item) => (

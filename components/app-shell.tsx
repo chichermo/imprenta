@@ -8,7 +8,6 @@ import {
   companyProfile,
   navigationSections,
   quickActions,
-  shellHighlights,
 } from "@/lib/app-data";
 
 type AppShellProps = {
@@ -33,19 +32,10 @@ export function AppShell({ title, description, children }: AppShellProps) {
           <div className="brand-tags">
             <span className="region-tag">{companyProfile.region}</span>
             <span className="region-tag region-tag--secondary">
-              {companyProfile.status}
+              {companyProfile.specialty}
             </span>
           </div>
         </Link>
-
-        <section className="sidebar-panel">
-          <p className="sidebar-panel__title">Foco actual</p>
-          <strong>{companyProfile.focus}</strong>
-          <p className="sidebar-panel__copy">
-            El objetivo de esta etapa es ordenar navegacion, look & feel y
-            flujo comercial antes de conectar datos reales.
-          </p>
-        </section>
 
         <nav aria-label="Navegacion principal" className="nav-sections">
           {navigationSections.map((section) => (
@@ -81,7 +71,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
         <header className="topbar">
           <div className="page-header">
             <div>
-              <p className="eyebrow">Operacion abierta</p>
+              <p className="eyebrow">Panel general</p>
               <h2>{title}</h2>
             </div>
             <p className="page-description">{description}</p>
@@ -95,16 +85,6 @@ export function AppShell({ title, description, children }: AppShellProps) {
             ))}
           </div>
         </header>
-
-        <section className="shell-highlights">
-          {shellHighlights.map((highlight) => (
-            <article className="shell-highlight-card" key={highlight.label}>
-              <span>{highlight.label}</span>
-              <strong>{highlight.value}</strong>
-              <small>{highlight.helper}</small>
-            </article>
-          ))}
-        </section>
 
         <main>{children}</main>
       </div>

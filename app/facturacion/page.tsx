@@ -20,8 +20,8 @@ const dteFlow = [
 export default function BillingPage() {
   return (
     <AppShell
-      title="Preparacion para facturacion electronica"
-      description="Pantalla semilla para el flujo tributario chileno, sin acoplar aun la implementacion final del DTE."
+      title="Facturacion electronica"
+      description="Control tributario para documentos electronicos y seguimiento DTE en Chile."
     >
       <div className="content-grid">
         <SectionCard
@@ -65,7 +65,7 @@ export default function BillingPage() {
 
         <SectionCard
           title="Flujo tecnico esperado"
-          description="La logica tributaria quedara en backend y funciones, no en el cliente."
+          description="La validacion tributaria se procesa fuera de la interfaz y queda trazada por documento."
         >
           <ol className="number-list">
             {dteFlow.map((step) => (

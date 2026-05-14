@@ -18,7 +18,7 @@ export default function DeliveriesPage() {
       <div className="content-grid">
         <SectionCard
           title="Despachos programados"
-          description="Vista semilla para coordinar ruta y cumplimiento de entrega."
+          description="Vista para coordinar ruta, cumplimiento y trazabilidad de entrega."
         >
           <div className="table-wrap">
             <table className="data-table">
@@ -52,7 +52,7 @@ export default function DeliveriesPage() {
 
         <SectionCard
           title="Notas operativas"
-          description="Puntos importantes para una fase posterior con flujos reales."
+          description="Consideraciones clave para despachos parciales, completos o con documento asociado."
         >
           <ul className="bullet-list">
             {deliveryNotes.map((note) => (

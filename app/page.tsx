@@ -2,23 +2,23 @@ import { AppShell } from "@/components/app-shell";
 import { SectionCard } from "@/components/section-card";
 import { StatusPill } from "@/components/status-pill";
 import {
-  appwriteCollections,
   commercialFlow,
   dashboardMetrics,
-  implementationRoadmap,
 } from "@/lib/app-data";
 import {
+  categoryPerformance,
   dashboardAlerts,
   purchaseOrderRecords,
   quoteRecords,
+  receivableRecords,
   workOrderRecords,
 } from "@/lib/mock-data";
 
 export default function HomePage() {
   return (
     <AppShell
-      title="Base operativa para la app web"
-      description="Dashboard inicial con foco en ventas B2B, trabajos personalizados, inventario y preparacion para DTE en Chile."
+      title="Panel operativo"
+      description="Resumen comercial, productivo y administrativo para la gestion diaria de Distribuidora San Pablo S.A."
     >
       <div className="page-grid">
         <section className="metric-grid">
@@ -47,8 +47,8 @@ export default function HomePage() {
           </SectionCard>
 
           <SectionCard
-            title="Flujo comercial sugerido"
-            description="Pensado para combinar insumos medicos, imprenta y trabajos especiales."
+            title="Circuito comercial"
+            description="Asi se mueve el trabajo entre ventas, produccion, entrega y administracion."
           >
             <div className="stack-list">
               {commercialFlow.map((stage) => (
@@ -62,7 +62,7 @@ export default function HomePage() {
 
           <SectionCard
             title="Cotizaciones activas"
-            description="Muestra de como se veria la bandeja comercial priorizada."
+            description="Bandeja comercial priorizada para seguimiento diario."
           >
             <div className="table-wrap">
               <table className="data-table">
@@ -95,23 +95,34 @@ export default function HomePage() {
           </SectionCard>
 
           <SectionCard
-            title="Fases de implementacion"
-            description="Orden recomendado para construir sin sobrecargar la primera version."
+            title="Cobranzas prioritarias"
+            description="Documentos con seguimiento mas sensible por vencimiento o monto."
           >
-            <div className="stack-list">
-              {implementationRoadmap.map((phase) => (
-                <article className="phase-card" key={phase.phase}>
-                  <div className="phase-header">
-                    <span className="phase-tag">{phase.phase}</span>
-                    <strong>{phase.title}</strong>
-                  </div>
-                  <ul>
-                    {phase.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Documento</th>
+                    <th>Vencimiento</th>
+                    <th>Monto</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receivableRecords.map((record) => (
+                    <tr key={record.document}>
+                      <td>{record.customer}</td>
+                      <td>{record.document}</td>
+                      <td>{record.dueDate}</td>
+                      <td>{record.amount}</td>
+                      <td>
+                        <StatusPill label={record.status} tone={record.tone} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </SectionCard>
 
@@ -153,20 +164,19 @@ export default function HomePage() {
           </SectionCard>
 
           <SectionCard
-            title="Colecciones Appwrite prioritarias"
-            description="Modelo semilla para clientes, cotizaciones, stock y futura capa tributaria."
+            title="Rendimiento por linea"
+            description="Participacion comercial estimada de cada linea del negocio."
           >
             <div className="collection-grid">
-              {appwriteCollections.map((collection) => (
-                <article className="collection-card" key={collection.name}>
+              {categoryPerformance.map((category) => (
+                <article className="collection-card" key={category.category}>
                   <div className="collection-card__header">
-                    <h4>{collection.name}</h4>
-                    <p>{collection.purpose}</p>
+                    <h4>{category.category}</h4>
+                    <p>{category.trend}</p>
                   </div>
                   <ul>
-                    {collection.fields.map((field) => (
-                      <li key={field}>{field}</li>
-                    ))}
+                    <li>Ventas: {category.sales}</li>
+                    <li>Participacion: {category.share}</li>
                   </ul>
                 </article>
               ))}
