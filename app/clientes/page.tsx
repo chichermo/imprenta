@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { CustomerIntakePanel } from "@/components/customer-intake-panel";
 import { SectionCard } from "@/components/section-card";
 import { customerRecords } from "@/lib/mock-data";
 
@@ -41,6 +42,8 @@ export default function CustomersPage() {
             <small>Se debe guardar por cliente para cotizar y facturar correctamente.</small>
           </article>
         </section>
+
+        <CustomerIntakePanel />
 
         <SectionCard
           title="Base de clientes"

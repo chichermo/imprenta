@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { QuoteWorkbench } from "@/components/quote-workbench";
 import { SectionCard } from "@/components/section-card";
 import { StatusPill } from "@/components/status-pill";
 import { quoteRecords, quoteTemplateChecklist } from "@/lib/mock-data";
@@ -42,6 +43,8 @@ export default function QuotesPage() {
             <small>Un mismo documento puede mezclar insumos, impresion y senaletica.</small>
           </article>
         </section>
+
+        <QuoteWorkbench />
 
         <SectionCard
           title="Bandeja comercial"
@@ -88,29 +91,31 @@ export default function QuotesPage() {
           </ul>
         </SectionCard>
 
-        <SectionCard
-          title="Estados sugeridos"
-          description="Ayudan a ordenar seguimiento comercial y conversion a produccion."
-        >
-          <div className="tag-list">
-            {quoteStates.map((state) => (
-              <span className="soft-tag" key={state}>
-                {state}
-              </span>
-            ))}
-          </div>
-        </SectionCard>
+        <div className="split-grid">
+          <SectionCard
+            title="Estados sugeridos"
+            description="Ayudan a ordenar seguimiento comercial y conversion a produccion."
+          >
+            <div className="tag-list">
+              {quoteStates.map((state) => (
+                <span className="soft-tag" key={state}>
+                  {state}
+                </span>
+              ))}
+            </div>
+          </SectionCard>
 
-        <SectionCard
-          title="Checklist minimo por cotizacion"
-          description="Campos que conviene exigir incluso antes de conectar Appwrite."
-        >
-          <ul className="bullet-list">
-            {quoteTemplateChecklist.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </SectionCard>
+          <SectionCard
+            title="Checklist minimo por cotizacion"
+            description="Campos que conviene exigir incluso antes de conectar Appwrite."
+          >
+            <ul className="bullet-list">
+              {quoteTemplateChecklist.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </SectionCard>
+        </div>
       </div>
     </AppShell>
   );

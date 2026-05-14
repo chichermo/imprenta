@@ -1,0 +1,518 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+import { StatusPill } from "@/components/status-pill";
+import { formatClp, parseClp, parseNumericText, parseStockText } from "@/lib/formatters";
+import { catalogRecords, customerRecords } from "@/lib/mock-data";
+
+type LineSource = "catalogo" | "custom";
+
+type DraftLine = {
+  id: string;
+  source: LineSource;
+  code: string;
+  name: string;
+  type: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  notes: string;
+  stock: string;
+};
+
+const baseLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+export function QuoteWorkbench() {
+  const [selectedCustomer, setSelectedCustomer] = useState(customerRecords[0].businessName);
+  const [validityDays, setValidityDays] = useState("7");
+  const [deliveryWindow, setDeliveryWindow] = useState("5 dias habiles");
+  const [quoteNote, setQuoteNote] = useState(
+    "Cotizacion referencial sujeta a confirmacion de stock y aprobacion tecnica.",
+  );
+  const [includeVat, setIncludeVat] = useState(true);
+
+  const [lineSource, setLineSource] = useState<LineSource>("catalogo");
+  const [selectedItemCode, setSelectedItemCode] = useState(catalogRecords[0].code);
+  const [quantity, setQuantity] = useState("1");
+  const [discountPercent, setDiscountPercent] = useState("0");
+  const [technicalNotes, setTechnicalNotes] = useState("");
+  const [customName, setCustomName] = useState("Letrero clinico acrilico");
+  const [customType, setCustomType] = useState("Servicio");
+  const [customUnit, setCustomUnit] = useState("m2");
+  const [customPrice, setCustomPrice] = useState("28000");
+  const [customStock, setCustomStock] = useState("A pedido");
+
+  const selectedCustomerRecord =
+    customerRecords.find((customer) => customer.businessName === selectedCustomer) ??
+    customerRecords[0];
+
+  const selectedCatalogItem =
+    catalogRecords.find((item) => item.code === selectedItemCode) ?? catalogRecords[0];
+
+  const [lines, setLines] = useState<DraftLine[]>([
+    {
+      id: "seed-1",
+      source: "catalogo",
+      code: catalogRecords[0].code,
+      name: catalogRecords[0].name,
+      type: catalogRecords[0].type,
+      unit: catalogRecords[0].unit,
+      quantity: 4,
+      unitPrice: parseClp(catalogRecords[0].price),
+      discountPercent: 0,
+      notes: "Consumo recurrente para reposicion semanal.",
+      stock: catalogRecords[0].stock,
+    },
+    {
+      id: "seed-2",
+      source: "catalogo",
+      code: catalogRecords[2].code,
+      name: catalogRecords[2].name,
+      type: catalogRecords[2].type,
+      unit: catalogRecords[2].unit,
+      quantity: 12,
+      unitPrice: parseClp(catalogRecords[2].price),
+      discountPercent: 5,
+      notes: "Talonarios para recepcion con duplicado.",
+      stock: catalogRecords[2].stock,
+    },
+  ]);
+
+  const quoteTotals = useMemo(() => {
+    const netSubtotal = lines.reduce((total, line) => {
+      const grossLine = line.quantity * line.unitPrice;
+      const lineDiscount = grossLine * (line.discountPercent / 100);
+      return total + (grossLine - lineDiscount);
+    }, 0);
+
+    const tax = includeVat ? Math.round(netSubtotal * 0.19) : 0;
+    const grandTotal = netSubtotal + tax;
+    const hasProductionWork = lines.some(
+      (line) => line.type === "Servicio" || line.type === "Trabajo",
+    );
+    const requiresPurchaseReview = lines.some((line) => {
+      const availableStock = parseStockText(line.stock);
+      return availableStock > 0 && line.quantity > availableStock;
+    });
+
+    return {
+      netSubtotal,
+      tax,
+      grandTotal,
+      hasProductionWork,
+      requiresPurchaseReview,
+    };
+  }, [includeVat, lines]);
+
+  function resetEntryForm() {
+    setQuantity("1");
+    setDiscountPercent("0");
+    setTechnicalNotes("");
+    setCustomName("Letrero clinico acrilico");
+    setCustomType("Servicio");
+    setCustomUnit("m2");
+    setCustomPrice("28000");
+    setCustomStock("A pedido");
+  }
+
+  function addLine() {
+    const parsedQuantity = Math.max(1, parseNumericText(quantity));
+    const parsedDiscount = Math.max(0, parseNumericText(discountPercent));
+
+    if (lineSource === "catalogo") {
+      setLines((currentLines) => [
+        ...currentLines,
+        {
+          id: baseLineId(),
+          source: "catalogo",
+          code: selectedCatalogItem.code,
+          name: selectedCatalogItem.name,
+          type: selectedCatalogItem.type,
+          unit: selectedCatalogItem.unit,
+          quantity: parsedQuantity,
+          unitPrice: parseClp(selectedCatalogItem.price),
+          discountPercent: parsedDiscount,
+          notes: technicalNotes,
+          stock: selectedCatalogItem.stock,
+        },
+      ]);
+      resetEntryForm();
+      return;
+    }
+
+    setLines((currentLines) => [
+      ...currentLines,
+      {
+        id: baseLineId(),
+        source: "custom",
+        code: "CUSTOM",
+        name: customName.trim() || "Item personalizado",
+        type: customType.trim() || "Servicio",
+        unit: customUnit.trim() || "unidad",
+        quantity: parsedQuantity,
+        unitPrice: Math.max(0, parseNumericText(customPrice)),
+        discountPercent: parsedDiscount,
+        notes: technicalNotes,
+        stock: customStock.trim() || "A pedido",
+      },
+    ]);
+    resetEntryForm();
+  }
+
+  function removeLine(lineId: string) {
+    setLines((currentLines) => currentLines.filter((line) => line.id !== lineId));
+  }
+
+  return (
+    <div className="quote-workbench">
+      <section className="builder-pane builder-pane--primary">
+        <div className="builder-header">
+          <div>
+            <p className="eyebrow">Mesa comercial</p>
+            <h3>Armador de cotizaciones</h3>
+          </div>
+          <div className="builder-status-row">
+            <StatusPill label="Borrador activo" tone="neutral" />
+            <StatusPill
+              label={includeVat ? "IVA 19% activo" : "Sin IVA"}
+              tone={includeVat ? "info" : "warning"}
+            />
+          </div>
+        </div>
+
+        <div className="quote-workspace-grid">
+          <div className="builder-block">
+            <div className="builder-block__header">
+              <strong>Cabecera comercial</strong>
+              <p>Cliente, vigencia, entrega y notas generales.</p>
+            </div>
+
+            <div className="form-grid">
+              <label className="field-group field-group--span-2">
+                <span className="field-label">Cliente</span>
+                <select
+                  className="field-control"
+                  onChange={(event) => setSelectedCustomer(event.target.value)}
+                  value={selectedCustomer}
+                >
+                  {customerRecords.map((customer) => (
+                    <option key={customer.businessName} value={customer.businessName}>
+                      {customer.businessName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-group">
+                <span className="field-label">Validez en dias</span>
+                <input
+                  className="field-control"
+                  min="1"
+                  onChange={(event) => setValidityDays(event.target.value)}
+                  type="number"
+                  value={validityDays}
+                />
+              </label>
+
+              <label className="field-group">
+                <span className="field-label">Ventana de entrega</span>
+                <input
+                  className="field-control"
+                  onChange={(event) => setDeliveryWindow(event.target.value)}
+                  value={deliveryWindow}
+                />
+              </label>
+
+              <label className="field-group field-group--span-2">
+                <span className="field-label">Observaciones comerciales</span>
+                <textarea
+                  className="field-control field-control--textarea"
+                  onChange={(event) => setQuoteNote(event.target.value)}
+                  rows={3}
+                  value={quoteNote}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="builder-block">
+            <div className="builder-block__header">
+              <strong>Detalle de items</strong>
+              <p>Mezcla catalogo y trabajos personalizados dentro de la misma cotizacion.</p>
+            </div>
+
+            <div className="mode-switch" role="tablist" aria-label="Origen del item">
+              <button
+                className={`mode-chip${lineSource === "catalogo" ? " mode-chip--active" : ""}`}
+                onClick={() => setLineSource("catalogo")}
+                type="button"
+              >
+                Desde catalogo
+              </button>
+              <button
+                className={`mode-chip${lineSource === "custom" ? " mode-chip--active" : ""}`}
+                onClick={() => setLineSource("custom")}
+                type="button"
+              >
+                Trabajo personalizado
+              </button>
+            </div>
+
+            <div className="form-grid">
+              {lineSource === "catalogo" ? (
+                <label className="field-group field-group--span-2">
+                  <span className="field-label">Item catalogo</span>
+                  <select
+                    className="field-control"
+                    onChange={(event) => setSelectedItemCode(event.target.value)}
+                    value={selectedItemCode}
+                  >
+                    {catalogRecords.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.code} · {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <>
+                  <label className="field-group field-group--span-2">
+                    <span className="field-label">Nombre del trabajo</span>
+                    <input
+                      className="field-control"
+                      onChange={(event) => setCustomName(event.target.value)}
+                      value={customName}
+                    />
+                  </label>
+                  <label className="field-group">
+                    <span className="field-label">Tipo</span>
+                    <input
+                      className="field-control"
+                      onChange={(event) => setCustomType(event.target.value)}
+                      value={customType}
+                    />
+                  </label>
+                  <label className="field-group">
+                    <span className="field-label">Unidad</span>
+                    <input
+                      className="field-control"
+                      onChange={(event) => setCustomUnit(event.target.value)}
+                      value={customUnit}
+                    />
+                  </label>
+                  <label className="field-group">
+                    <span className="field-label">Precio unitario neto</span>
+                    <input
+                      className="field-control"
+                      onChange={(event) => setCustomPrice(event.target.value)}
+                      type="number"
+                      value={customPrice}
+                    />
+                  </label>
+                  <label className="field-group">
+                    <span className="field-label">Stock / condicion</span>
+                    <input
+                      className="field-control"
+                      onChange={(event) => setCustomStock(event.target.value)}
+                      value={customStock}
+                    />
+                  </label>
+                </>
+              )}
+
+              <label className="field-group">
+                <span className="field-label">Cantidad</span>
+                <input
+                  className="field-control"
+                  min="1"
+                  onChange={(event) => setQuantity(event.target.value)}
+                  type="number"
+                  value={quantity}
+                />
+              </label>
+
+              <label className="field-group">
+                <span className="field-label">Descuento %</span>
+                <input
+                  className="field-control"
+                  min="0"
+                  onChange={(event) => setDiscountPercent(event.target.value)}
+                  type="number"
+                  value={discountPercent}
+                />
+              </label>
+
+              <label className="field-group field-group--span-2">
+                <span className="field-label">Notas tecnicas del item</span>
+                <textarea
+                  className="field-control field-control--textarea"
+                  onChange={(event) => setTechnicalNotes(event.target.value)}
+                  rows={3}
+                  value={technicalNotes}
+                />
+              </label>
+            </div>
+
+            <div className="builder-actions">
+              <button className="action-button" onClick={addLine} type="button">
+                Agregar item
+              </button>
+              <button
+                className="ghost-button"
+                onClick={() => setIncludeVat((current) => !current)}
+                type="button"
+              >
+                {includeVat ? "Quitar IVA" : "Agregar IVA"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="builder-block">
+          <div className="builder-block__header">
+            <strong>Detalle armado</strong>
+            <p>Los items agregados quedan listos para PDF, orden de trabajo o revision administrativa.</p>
+          </div>
+
+          <div className="quote-line-list">
+            {lines.map((line) => {
+              const grossLine = line.quantity * line.unitPrice;
+              const discountAmount = grossLine * (line.discountPercent / 100);
+              const netLine = grossLine - discountAmount;
+              const needsPurchaseReview =
+                parseStockText(line.stock) > 0 && line.quantity > parseStockText(line.stock);
+
+              return (
+                <article className="quote-line-card" key={line.id}>
+                  <div className="quote-line-card__top">
+                    <div>
+                      <div className="quote-line-card__eyebrow">
+                        {line.code} · {line.type}
+                      </div>
+                      <strong>{line.name}</strong>
+                    </div>
+                    <button
+                      className="quote-line-card__remove"
+                      onClick={() => removeLine(line.id)}
+                      type="button"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+
+                  <div className="quote-line-card__meta">
+                    <span>
+                      {line.quantity} {line.unit}
+                    </span>
+                    <span>{formatClp(line.unitPrice)} unitario</span>
+                    <span>{line.discountPercent}% desc.</span>
+                    <span>Stock: {line.stock}</span>
+                  </div>
+
+                  {line.notes ? <p>{line.notes}</p> : null}
+
+                  <div className="quote-line-card__footer">
+                    <div className="quote-line-card__signals">
+                      <StatusPill
+                        label={line.source === "catalogo" ? "Catalogo" : "Personalizado"}
+                        tone={line.source === "catalogo" ? "info" : "warning"}
+                      />
+                      {needsPurchaseReview ? (
+                        <StatusPill label="Revisar compra" tone="danger" />
+                      ) : null}
+                    </div>
+                    <strong>{formatClp(netLine)}</strong>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <aside className="builder-pane builder-pane--summary">
+        <div className="quote-summary-card">
+          <div className="quote-summary-card__header">
+            <p className="eyebrow">Resumen ejecutivo</p>
+            <h3>{selectedCustomerRecord.businessName}</h3>
+          </div>
+
+          <div className="summary-list">
+            <div className="summary-list__row">
+              <span>RUT</span>
+              <strong>{selectedCustomerRecord.rut}</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>Condicion de pago</span>
+              <strong>{selectedCustomerRecord.paymentTerms}</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>Comuna</span>
+              <strong>{selectedCustomerRecord.commune}</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>Validez</span>
+              <strong>{validityDays} dias</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>Entrega estimada</span>
+              <strong>{deliveryWindow}</strong>
+            </div>
+          </div>
+
+          <div className="quote-total-card">
+            <div className="summary-list__row">
+              <span>Neto</span>
+              <strong>{formatClp(quoteTotals.netSubtotal)}</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>IVA</span>
+              <strong>{formatClp(quoteTotals.tax)}</strong>
+            </div>
+            <div className="summary-list__row summary-list__row--grand">
+              <span>Total</span>
+              <strong>{formatClp(quoteTotals.grandTotal)}</strong>
+            </div>
+          </div>
+
+          <div className="summary-signals">
+            <StatusPill
+              label={quoteTotals.hasProductionWork ? "Genera OT" : "Venta directa"}
+              tone={quoteTotals.hasProductionWork ? "warning" : "success"}
+            />
+            <StatusPill
+              label={
+                quoteTotals.requiresPurchaseReview ? "Revisar stock y OC" : "Stock controlado"
+              }
+              tone={quoteTotals.requiresPurchaseReview ? "danger" : "success"}
+            />
+          </div>
+        </div>
+
+        <div className="quote-summary-card quote-summary-card--secondary">
+          <div className="quote-summary-card__header">
+            <p className="eyebrow">Checklist operativo</p>
+            <h3>Proximo paso</h3>
+          </div>
+
+          <div className="timeline-list">
+            <article>
+              <strong>1. Enviar cotizacion</strong>
+              <p>Con nota comercial y vigencia clara para la aprobacion del cliente.</p>
+            </article>
+            <article>
+              <strong>2. Validar produccion</strong>
+              <p>Si hay trabajos personalizados, generar orden de trabajo automaticamente.</p>
+            </article>
+            <article>
+              <strong>3. Revisar abastecimiento</strong>
+              <p>Si una linea supera stock disponible, disparar orden de compra o reserva.</p>
+            </article>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
