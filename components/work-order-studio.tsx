@@ -3,7 +3,10 @@
 import { useMemo, useState } from "react";
 
 import {
+  buildPurchaseLinesFromSuggestions,
+  buildPurchaseSuggestionsFromQuoteLines,
   formatStoredQuoteTotal,
+  StoredWorkOrder,
   useAppState,
 } from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
@@ -44,8 +47,14 @@ function createStageTemplates(area: string) {
   }
 }
 
+function buildDefaultEta(daysAhead: number) {
+  const etaDate = new Date();
+  etaDate.setDate(etaDate.getDate() + daysAhead);
+  return etaDate.toISOString().slice(0, 10);
+}
+
 export function WorkOrderStudio() {
-  const { createWorkOrder, savedQuotes, workOrders } = useAppState();
+  const { createPurchase, createWorkOrder, purchases, savedQuotes, workOrders } = useAppState();
   const sharedQuoteSeed = savedQuotes[0]?.number ?? quoteRecords[0].number;
   const [selectedQuote, setSelectedQuote] = useState(sharedQuoteSeed);
   const [area, setArea] = useState("Imprenta");
@@ -57,6 +66,7 @@ export function WorkOrderStudio() {
     "Validar aprobacion del cliente antes de liberar a produccion.",
   );
   const [lastCreated, setLastCreated] = useState<string | null>(null);
+  const [lastCreatedPurchase, setLastCreatedPurchase] = useState<string | null>(null);
 
   const quoteOptions = useMemo(() => {
     const shared = savedQuotes.map((quote) => ({
@@ -80,6 +90,18 @@ export function WorkOrderStudio() {
 
   const quote =
     quoteOptions.find((record) => record.number === selectedQuote) ?? quoteOptions[0];
+  const selectedSharedQuote = useMemo(
+    () => savedQuotes.find((record) => record.number === selectedQuote),
+    [savedQuotes, selectedQuote],
+  );
+  const inheritedLines = useMemo(
+    () => selectedSharedQuote?.lines ?? [],
+    [selectedSharedQuote],
+  );
+  const purchaseSuggestions = useMemo(
+    () => buildPurchaseSuggestionsFromQuoteLines(inheritedLines),
+    [inheritedLines],
+  );
   const stageTemplates = useMemo(() => createStageTemplates(area), [area]);
   const generatedNumber = `OT-${selectedQuote.replace("COT-", "")}`;
 
@@ -98,6 +120,31 @@ export function WorkOrderStudio() {
     });
 
     setLastCreated(workOrder.number);
+  }
+
+  function handleCreatePurchaseFromOrder(order: Pick<StoredWorkOrder, "number" | "purchaseSuggestions">) {
+    if (order.purchaseSuggestions.length === 0) {
+      return;
+    }
+
+    const existingPurchase = purchases.find((purchase) => purchase.sourceReference === order.number);
+
+    if (existingPurchase) {
+      setLastCreatedPurchase(existingPurchase.number);
+      return;
+    }
+
+    const [primarySuggestion] = order.purchaseSuggestions;
+    const purchase = createPurchase({
+      supplier: primarySuggestion.suggestedSupplier,
+      eta: buildDefaultEta(4),
+      sourceReference: order.number,
+      lines: buildPurchaseLinesFromSuggestions(order.purchaseSuggestions),
+    });
+
+    if (purchase) {
+      setLastCreatedPurchase(purchase.number);
+    }
   }
 
   return (
@@ -233,6 +280,77 @@ export function WorkOrderStudio() {
             ))}
           </div>
         </div>
+
+        <div className="builder-block">
+          <div className="builder-block__header">
+            <strong>Lineas heredadas desde la cotizacion</strong>
+            <p>La OT conserva cantidades, notas y tipo de trabajo cuando nace desde una cotizacion guardada.</p>
+          </div>
+
+          <div className="quote-line-list">
+            {inheritedLines.length === 0 ? (
+              <article className="quote-line-card">
+                <strong>Esta cotizacion no trae detalle compartido aun</strong>
+                <p>Usa una cotizacion creada desde el armador comercial para transferir sus lineas a produccion.</p>
+              </article>
+            ) : (
+              inheritedLines.map((line) => (
+                <article className="quote-line-card" key={line.id}>
+                  <div className="quote-line-card__top">
+                    <div>
+                      <div className="quote-line-card__eyebrow">
+                        {line.code} · {line.type}
+                      </div>
+                      <strong>{line.name}</strong>
+                    </div>
+                    <strong>{line.quantity} {line.unit}</strong>
+                  </div>
+                  <div className="quote-line-card__meta">
+                    <span>Stock declarado: {line.stock}</span>
+                    <span>{formatStoredQuoteTotal(line.unitPrice)} unitario</span>
+                  </div>
+                  {line.notes ? <p>{line.notes}</p> : null}
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="builder-block">
+          <div className="builder-block__header">
+            <strong>Sugerencias de abastecimiento</strong>
+            <p>Si una linea supera el stock disponible, la OT deja lista la recomendacion para Compras.</p>
+          </div>
+
+          <div className="quote-line-list">
+            {purchaseSuggestions.length === 0 ? (
+              <article className="quote-line-card">
+                <strong>Sin faltantes detectados</strong>
+                <p>Las lineas heredadas no requieren reposicion inmediata para ejecutar la orden.</p>
+              </article>
+            ) : (
+              purchaseSuggestions.map((suggestion) => (
+                <article className="quote-line-card" key={suggestion.id}>
+                  <div className="quote-line-card__top">
+                    <div>
+                      <div className="quote-line-card__eyebrow">
+                        Compra sugerida · {suggestion.sourceCode}
+                      </div>
+                      <strong>{suggestion.item}</strong>
+                    </div>
+                    <strong>{suggestion.shortageQuantity} faltantes</strong>
+                  </div>
+                  <div className="quote-line-card__meta">
+                    <span>Solicitado: {suggestion.requiredQuantity}</span>
+                    <span>Disponible: {suggestion.availableStock}</span>
+                    <span>Proveedor: {suggestion.suggestedSupplier}</span>
+                  </div>
+                  <p>{suggestion.reason}</p>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
       </section>
 
       <aside className="builder-pane builder-pane--summary">
@@ -267,6 +385,14 @@ export function WorkOrderStudio() {
               <span>Valor referencial</span>
               <strong>{quote.totalLabel}</strong>
             </div>
+            <div className="summary-list__row">
+              <span>Lineas heredadas</span>
+              <strong>{inheritedLines.length}</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>Compras sugeridas</span>
+              <strong>{purchaseSuggestions.length}</strong>
+            </div>
           </div>
 
           <div className="summary-signals">
@@ -275,6 +401,15 @@ export function WorkOrderStudio() {
               label={requiresInstallation ? "Coordinar instalacion" : "Solo produccion interna"}
               tone={requiresInstallation ? "warning" : "success"}
             />
+            <StatusPill
+              label={
+                purchaseSuggestions.length > 0 ? "Derivar faltantes a Compras" : "Sin faltantes criticos"
+              }
+              tone={purchaseSuggestions.length > 0 ? "warning" : "success"}
+            />
+            {lastCreatedPurchase ? (
+              <StatusPill label={`OC directa ${lastCreatedPurchase}`} tone="success" />
+            ) : null}
           </div>
 
           <p>{notes}</p>
@@ -301,6 +436,18 @@ export function WorkOrderStudio() {
                   <p>
                     {order.area} · entrega {order.dueDate}
                   </p>
+                  <div className="builder-actions">
+                    <button
+                      className="ghost-button"
+                      disabled={order.purchaseSuggestions.length === 0}
+                      onClick={() => handleCreatePurchaseFromOrder(order)}
+                      type="button"
+                    >
+                      {order.purchaseSuggestions.length > 0
+                        ? "Crear OC sugerida"
+                        : "Sin compra requerida"}
+                    </button>
+                  </div>
                 </article>
               ))
             )}

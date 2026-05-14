@@ -86,10 +86,14 @@ textarea {
 }
 
 .sidebar {
-  position: relative;
+  position: sticky;
+  top: 0;
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  height: 100vh;
+  overflow: hidden;
   padding: 32px 24px;
   border-right: 1px solid var(--border-dark);
   background:
@@ -284,8 +288,31 @@ textarea {
 }
 
 .nav-sections {
+  flex: 1;
+  min-height: 0;
   display: grid;
   gap: 20px;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 199, 234, 0.36) rgba(255, 255, 255, 0.04);
+}
+
+.nav-sections::-webkit-scrollbar {
+  width: 10px;
+}
+
+.nav-sections::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-sections::-webkit-scrollbar-thumb {
+  background: rgba(90, 199, 234, 0.28);
+  border-radius: 999px;
+}
+
+.nav-sections::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 199, 234, 0.42);
 }
 
 .nav-section {
@@ -459,6 +486,13 @@ textarea {
 .mode-chip:hover {
   background: rgba(41, 183, 176, 0.08);
   border-color: rgba(41, 183, 176, 0.25);
+}
+
+.ghost-button:disabled,
+.action-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .mode-chip--active {
@@ -1161,8 +1195,18 @@ textarea {
   }
 
   .sidebar {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: auto;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--border-dark);
+  }
+
+  .nav-sections {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .quote-workbench,

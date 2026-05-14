@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
+  formatStoredQuoteTotal,
   SharedQuoteLine,
   useAppState,
 } from "@/components/app-state-provider";
@@ -12,15 +13,72 @@ import { catalogRecords, customerRecords } from "@/lib/mock-data";
 
 const baseLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+function buildDefaultDueDate(daysAhead: number) {
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + daysAhead);
+  return dueDate.toISOString().slice(0, 10);
+}
+
+function inferWorkOrderArea(lines: SharedQuoteLine[]) {
+  const normalizedHaystack = lines
+    .map((line) => `${line.name} ${line.type} ${line.notes}`)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    normalizedHaystack.includes("letrero") ||
+    normalizedHaystack.includes("pvc") ||
+    normalizedHaystack.includes("senaletica") ||
+    normalizedHaystack.includes("trovisel")
+  ) {
+    return "Senaletica";
+  }
+
+  if (
+    normalizedHaystack.includes("banner") ||
+    normalizedHaystack.includes("adhesivo") ||
+    normalizedHaystack.includes("lona") ||
+    normalizedHaystack.includes("vinilo")
+  ) {
+    return "Gran formato";
+  }
+
+  return "Imprenta";
+}
+
+function inferResponsible(area: string) {
+  switch (area) {
+    case "Senaletica":
+      return "Taller PVC";
+    case "Gran formato":
+      return "Produccion";
+    default:
+      return "Preprensa";
+  }
+}
+
+function inferStages(area: string) {
+  switch (area) {
+    case "Senaletica":
+      return ["Diseno y aprobacion", "Corte y materialidad", "Montaje final"];
+    case "Gran formato":
+      return ["Preparacion de arte", "Impresion y laminado", "Terminacion y empaque"];
+    default:
+      return ["Preprensa", "Impresion", "Terminaciones"];
+  }
+}
+
 export function QuoteWorkbench() {
   const {
     addQuoteLine,
+    createWorkOrder,
     quoteDraft,
     quoteDraftTotals,
     removeQuoteLine,
     saveQuoteDraft,
     savedQuotes,
     updateQuoteDraft,
+    workOrders,
   } = useAppState();
 
   const [lineSource, setLineSource] = useState<SharedQuoteLine["source"]>("catalogo");
@@ -34,6 +92,7 @@ export function QuoteWorkbench() {
   const [customPrice, setCustomPrice] = useState("28000");
   const [customStock, setCustomStock] = useState("A pedido");
   const [lastSavedQuoteNumber, setLastSavedQuoteNumber] = useState<string | null>(null);
+  const [lastCreatedWorkOrder, setLastCreatedWorkOrder] = useState<string | null>(null);
 
   const selectedCustomerRecord =
     customerRecords.find((customer) => customer.businessName === quoteDraft.customer) ??
@@ -98,6 +157,45 @@ export function QuoteWorkbench() {
     }
   }
 
+  function hasProductionWork(lines: SharedQuoteLine[]) {
+    return lines.some((line) => line.type === "Servicio" || line.type === "Trabajo");
+  }
+
+  function handleCreateWorkOrderFromQuote(quote: {
+    number: string;
+    customer: string;
+    total: number;
+    note: string;
+    lines: SharedQuoteLine[];
+  }) {
+    if (!hasProductionWork(quote.lines)) {
+      return;
+    }
+
+    const existingWorkOrder = workOrders.find((order) => order.quoteNumber === quote.number);
+
+    if (existingWorkOrder) {
+      setLastCreatedWorkOrder(existingWorkOrder.number);
+      return;
+    }
+
+    const area = inferWorkOrderArea(quote.lines);
+    const workOrder = createWorkOrder({
+      quoteNumber: quote.number,
+      customer: quote.customer,
+      area,
+      responsible: inferResponsible(area),
+      proof: "PDF digital",
+      dueDate: buildDefaultDueDate(3),
+      requiresInstallation: area === "Senaletica",
+      notes: quote.note || "Generada desde cotizacion aprobada para continuar el flujo productivo.",
+      stages: inferStages(area),
+      totalLabel: formatStoredQuoteTotal(quote.total),
+    });
+
+    setLastCreatedWorkOrder(workOrder.number);
+  }
+
   return (
     <div className="quote-workbench">
       <section className="builder-pane builder-pane--primary">
@@ -114,6 +212,9 @@ export function QuoteWorkbench() {
             />
             {lastSavedQuoteNumber ? (
               <StatusPill label={`Ultima sync ${lastSavedQuoteNumber}`} tone="success" />
+            ) : null}
+            {lastCreatedWorkOrder ? (
+              <StatusPill label={`OT directa ${lastCreatedWorkOrder}`} tone="warning" />
             ) : null}
           </div>
         </div>
@@ -475,6 +576,16 @@ export function QuoteWorkbench() {
                   <p>
                     {formatClp(quote.total)} · vence {quote.validUntilLabel}
                   </p>
+                  <div className="builder-actions">
+                    <button
+                      className="ghost-button"
+                      disabled={!hasProductionWork(quote.lines)}
+                      onClick={() => handleCreateWorkOrderFromQuote(quote)}
+                      type="button"
+                    >
+                      {hasProductionWork(quote.lines) ? "Crear OT directa" : "Venta directa"}
+                    </button>
+                  </div>
                 </article>
               ))
             )}

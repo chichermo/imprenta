@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   InventoryOperation,
@@ -25,6 +25,56 @@ export function InventoryControlPanel() {
   const [reference, setReference] = useState("COT-2026-041");
   const [lastCreatedMovement, setLastCreatedMovement] = useState<string | null>(null);
 
+  const buildReferenceSnapshot = useCallback(
+    (referenceNumber: string) => {
+      const referencePurchase = purchases.find((purchase) => purchase.number === referenceNumber);
+
+      if (referencePurchase) {
+        return {
+          preferredOperation: "Entrada" as InventoryOperation,
+          items: referencePurchase.lines.map((line) => ({
+            id: line.id,
+            item: line.item,
+            quantity: line.quantity,
+            detail: line.purpose,
+            context: "Entrada por compra",
+          })),
+        };
+      }
+
+      const referenceWorkOrder = workOrders.find((order) => order.number === referenceNumber);
+      const referenceQuote = savedQuotes.find((quote) => quote.number === referenceNumber);
+      const linkedQuote = savedQuotes.find(
+        (quote) => quote.number === referenceWorkOrder?.quoteNumber,
+      );
+      const operationalLines =
+        referenceWorkOrder?.lines?.length
+          ? referenceWorkOrder.lines
+          : linkedQuote?.lines ?? referenceQuote?.lines ?? [];
+
+      if (operationalLines.length > 0) {
+        return {
+          preferredOperation: referenceWorkOrder
+            ? ("Salida" as InventoryOperation)
+            : ("Reserva" as InventoryOperation),
+          items: operationalLines.map((line) => ({
+            id: line.id,
+            item: line.name,
+            quantity: line.quantity,
+            detail: line.notes || `${line.type} · stock ${line.stock}`,
+            context: referenceWorkOrder ? "Salida por OT" : "Reserva comercial",
+          })),
+        };
+      }
+
+      return {
+        preferredOperation: null,
+        items: [],
+      };
+    },
+    [purchases, savedQuotes, workOrders],
+  );
+
   const selectedItem = catalogRecords.find((record) => record.name === item) ?? catalogRecords[0];
   const referenceOptions = useMemo(
     () => [
@@ -35,6 +85,13 @@ export function InventoryControlPanel() {
     ],
     [purchases, savedQuotes, workOrders],
   );
+  const referenceItems = useMemo(() => {
+    return buildReferenceSnapshot(reference).items;
+  }, [buildReferenceSnapshot, reference]);
+  const itemOptions = useMemo(() => {
+    const referencedItems = referenceItems.map((entry) => entry.item);
+    return [...new Set([...referencedItems, ...catalogRecords.map((record) => record.name)])];
+  }, [referenceItems]);
 
   const stockState = useMemo(() => {
     const baseStock = parseStockText(selectedItem.stock);
@@ -60,6 +117,23 @@ export function InventoryControlPanel() {
       reorderPoint: 10,
     };
   }, [inventoryMovements, selectedItem]);
+
+  function handleReferenceChange(nextReference: string) {
+    setReference(nextReference);
+
+    const snapshot = buildReferenceSnapshot(nextReference);
+
+    if (snapshot.preferredOperation) {
+      setOperation(snapshot.preferredOperation);
+    }
+
+    if (snapshot.items.length === 0) {
+      return;
+    }
+
+    setItem(snapshot.items[0].item);
+    setQuantity(String(snapshot.items[0].quantity));
+  }
 
   function addMovement() {
     const parsedQuantity = Math.max(1, parseNumericText(quantity));
@@ -96,9 +170,9 @@ export function InventoryControlPanel() {
                 onChange={(event) => setItem(event.target.value)}
                 value={item}
               >
-                {catalogRecords.map((record) => (
-                  <option key={record.code} value={record.name}>
-                    {record.name}
+                {itemOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
                   </option>
                 ))}
               </select>
@@ -134,7 +208,7 @@ export function InventoryControlPanel() {
               <span className="field-label">Referencia</span>
               <select
                 className="field-control"
-                onChange={(event) => setReference(event.target.value)}
+                onChange={(event) => handleReferenceChange(event.target.value)}
                 value={reference}
               >
                 {referenceOptions.map((option) => (
@@ -150,6 +224,38 @@ export function InventoryControlPanel() {
             <button className="action-button" onClick={addMovement} type="button">
               Aplicar movimiento
             </button>
+          </div>
+        </div>
+
+        <div className="builder-block">
+          <div className="builder-block__header">
+            <strong>Detalle de la referencia</strong>
+            <p>Al elegir una cotizacion, OT u OC, el panel recupera sus lineas para reservar, consumir o ingresar stock.</p>
+          </div>
+
+          <div className="quote-line-list">
+            {referenceItems.length === 0 ? (
+              <article className="quote-line-card">
+                <strong>Referencia manual</strong>
+                <p>Selecciona un documento compartido para cargar automaticamente items y cantidades relacionadas.</p>
+              </article>
+            ) : (
+              referenceItems.map((entry) => (
+                <article className="quote-line-card" key={entry.id}>
+                  <div className="quote-line-card__top">
+                    <div>
+                      <div className="quote-line-card__eyebrow">{entry.context}</div>
+                      <strong>{entry.item}</strong>
+                    </div>
+                    <strong>{entry.quantity} unidades</strong>
+                  </div>
+                  <div className="quote-line-card__meta">
+                    <span>{reference}</span>
+                  </div>
+                  <p>{entry.detail}</p>
+                </article>
+              ))
+            )}
           </div>
         </div>
 
@@ -212,6 +318,10 @@ export function InventoryControlPanel() {
             <div className="summary-list__row">
               <span>Punto de reposicion</span>
               <strong>{stockState.reorderPoint}</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>Lineas en referencia</span>
+              <strong>{referenceItems.length}</strong>
             </div>
           </div>
 

@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 
 import {
+  buildPurchaseLinesFromSuggestions,
+  buildPurchaseSuggestionsFromQuoteLines,
   StoredPurchaseLine,
   useAppState,
 } from "@/components/app-state-provider";
@@ -33,6 +35,11 @@ export function PurchasePlanner() {
   const [lastCreatedPurchase, setLastCreatedPurchase] = useState<string | null>(null);
 
   const selectedSupplier = supplierRecords.find((record) => record.name === supplier) ?? supplierRecords[0];
+  const sourceQuote = savedQuotes.find((quote) => quote.number === sourceReference);
+  const sourceWorkOrder = workOrders.find((order) => order.number === sourceReference);
+  const linkedQuoteFromWorkOrder = savedQuotes.find(
+    (quote) => quote.number === sourceWorkOrder?.quoteNumber,
+  );
   const sourceOptions = useMemo(
     () => [
       "Manual",
@@ -41,6 +48,36 @@ export function PurchasePlanner() {
     ],
     [savedQuotes, workOrders],
   );
+  const sourceSuggestions = useMemo(() => {
+    if (sourceWorkOrder?.purchaseSuggestions?.length) {
+      return sourceWorkOrder.purchaseSuggestions;
+    }
+
+    if (sourceQuote) {
+      return buildPurchaseSuggestionsFromQuoteLines(sourceQuote.lines);
+    }
+
+    if (linkedQuoteFromWorkOrder) {
+      return buildPurchaseSuggestionsFromQuoteLines(linkedQuoteFromWorkOrder.lines);
+    }
+
+    return [];
+  }, [linkedQuoteFromWorkOrder, sourceQuote, sourceWorkOrder]);
+  const sourceItems = useMemo(() => {
+    if (sourceWorkOrder?.lines?.length) {
+      return sourceWorkOrder.lines;
+    }
+
+    if (sourceQuote) {
+      return sourceQuote.lines;
+    }
+
+    if (linkedQuoteFromWorkOrder) {
+      return linkedQuoteFromWorkOrder.lines;
+    }
+
+    return [];
+  }, [linkedQuoteFromWorkOrder, sourceQuote, sourceWorkOrder]);
 
   const suggestedItem =
     stockAlerts.find((alert) => alert.item === item)?.item ??
@@ -81,6 +118,47 @@ export function PurchasePlanner() {
         purpose: purpose.trim() || "Reposicion general",
       },
     ]);
+  }
+
+  function loadSuggestedLines() {
+    if (sourceSuggestions.length === 0) {
+      return;
+    }
+
+    setLines(buildPurchaseLinesFromSuggestions(sourceSuggestions));
+  }
+
+  function handleSourceReferenceChange(nextReference: string) {
+    setSourceReference(nextReference);
+
+    if (nextReference === "Manual") {
+      return;
+    }
+
+    const nextQuote = savedQuotes.find((quote) => quote.number === nextReference);
+    const nextWorkOrder = workOrders.find((order) => order.number === nextReference);
+    const nextLinkedQuote = savedQuotes.find(
+      (quote) => quote.number === nextWorkOrder?.quoteNumber,
+    );
+    const nextSuggestions = nextWorkOrder?.purchaseSuggestions?.length
+      ? nextWorkOrder.purchaseSuggestions
+      : nextQuote
+        ? buildPurchaseSuggestionsFromQuoteLines(nextQuote.lines)
+        : nextLinkedQuote
+          ? buildPurchaseSuggestionsFromQuoteLines(nextLinkedQuote.lines)
+          : [];
+
+    if (nextSuggestions.length === 0) {
+      return;
+    }
+
+    const [primarySuggestion] = nextSuggestions;
+
+    setSupplier(primarySuggestion.suggestedSupplier);
+    setItem(primarySuggestion.item);
+    setQuantity(String(primarySuggestion.shortageQuantity));
+    setUnitCost(String(primarySuggestion.unitCost));
+    setPurpose(primarySuggestion.reason);
   }
 
   function handleCreatePurchase() {
@@ -132,7 +210,7 @@ export function PurchasePlanner() {
               <span className="field-label">Origen del requerimiento</span>
               <select
                 className="field-control"
-                onChange={(event) => setSourceReference(event.target.value)}
+                onChange={(event) => handleSourceReferenceChange(event.target.value)}
                 value={sourceReference}
               >
                 {sourceOptions.map((option) => (
@@ -209,9 +287,92 @@ export function PurchasePlanner() {
             <button className="action-button" onClick={addLine} type="button">
               Agregar linea a OC
             </button>
+            <button
+              className="ghost-button"
+              disabled={sourceSuggestions.length === 0}
+              onClick={loadSuggestedLines}
+              type="button"
+            >
+              Reemplazar por sugeridas
+            </button>
             <button className="ghost-button" onClick={handleCreatePurchase} type="button">
               Guardar OC compartida
             </button>
+          </div>
+        </div>
+
+        <div className="builder-block">
+          <div className="builder-block__header">
+            <strong>Sugerencias automaticas del origen</strong>
+            <p>Compras puede recuperar faltantes detectados en cotizaciones u ordenes de trabajo.</p>
+          </div>
+
+          <div className="quote-line-list">
+            {sourceReference === "Manual" ? (
+              <article className="quote-line-card">
+                <strong>Origen manual</strong>
+                <p>Selecciona una cotizacion u OT para cargar faltantes calculados automaticamente.</p>
+              </article>
+            ) : sourceSuggestions.length === 0 ? (
+              <article className="quote-line-card">
+                <strong>Sin compras sugeridas para este origen</strong>
+                <p>El documento seleccionado no presenta faltantes con stock controlado.</p>
+              </article>
+            ) : (
+              sourceSuggestions.map((suggestion) => (
+                <article className="quote-line-card" key={suggestion.id}>
+                  <div className="quote-line-card__top">
+                    <div>
+                      <div className="quote-line-card__eyebrow">
+                        {sourceReference} · {suggestion.sourceCode}
+                      </div>
+                      <strong>{suggestion.item}</strong>
+                    </div>
+                    <strong>{suggestion.shortageQuantity} por comprar</strong>
+                  </div>
+                  <div className="quote-line-card__meta">
+                    <span>Stock: {suggestion.availableStock}</span>
+                    <span>Pedido: {suggestion.requiredQuantity}</span>
+                    <span>{suggestion.suggestedSupplier}</span>
+                  </div>
+                  <p>{suggestion.reason}</p>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="builder-block">
+          <div className="builder-block__header">
+            <strong>Detalle recuperado del origen</strong>
+            <p>Referencia rapida de lineas comerciales o productivas antes de emitir la OC.</p>
+          </div>
+
+          <div className="quote-line-list">
+            {sourceItems.length === 0 ? (
+              <article className="quote-line-card">
+                <strong>No hay lineas compartidas en este origen</strong>
+                <p>Las cotizaciones guardadas en el armador comercial apareceran aqui con su detalle.</p>
+              </article>
+            ) : (
+              sourceItems.map((line) => (
+                <article className="quote-line-card" key={line.id}>
+                  <div className="quote-line-card__top">
+                    <div>
+                      <div className="quote-line-card__eyebrow">
+                        {line.code} · {line.type}
+                      </div>
+                      <strong>{line.name}</strong>
+                    </div>
+                    <strong>{line.quantity} {line.unit}</strong>
+                  </div>
+                  <div className="quote-line-card__meta">
+                    <span>Stock: {line.stock}</span>
+                    <span>{formatClp(line.unitPrice)} unitario</span>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </div>
 
@@ -275,6 +436,10 @@ export function PurchasePlanner() {
               <strong>{sourceReference}</strong>
             </div>
             <div className="summary-list__row">
+              <span>Faltantes detectados</span>
+              <strong>{sourceSuggestions.length}</strong>
+            </div>
+            <div className="summary-list__row">
               <span>Subtotal</span>
               <strong>{formatClp(totals.subtotal)}</strong>
             </div>
@@ -291,6 +456,10 @@ export function PurchasePlanner() {
           <div className="summary-signals">
             <StatusPill label={selectedSupplier.status} tone={selectedSupplier.tone} />
             <StatusPill label={`${lines.length} lineas`} tone="info" />
+            <StatusPill
+              label={sourceSuggestions.length > 0 ? "Origen con faltantes" : "Sin alertas de compra"}
+              tone={sourceSuggestions.length > 0 ? "warning" : "success"}
+            />
           </div>
         </div>
 

@@ -9,8 +9,8 @@ import {
   useState,
 } from "react";
 
-import { customerRecords } from "@/lib/mock-data";
-import { formatClp } from "@/lib/formatters";
+import { catalogRecords, customerRecords, supplierRecords } from "@/lib/mock-data";
+import { formatClp, parseClp } from "@/lib/formatters";
 
 export type QuoteLineSource = "catalogo" | "custom";
 
@@ -56,6 +56,19 @@ export type SavedQuote = {
   createdAt: string;
 };
 
+export type PurchaseSuggestion = {
+  id: string;
+  item: string;
+  sourceCode: string;
+  sourceLineId: string;
+  requiredQuantity: number;
+  availableStock: number;
+  shortageQuantity: number;
+  suggestedSupplier: string;
+  unitCost: number;
+  reason: string;
+};
+
 export type StoredWorkOrder = {
   id: string;
   number: string;
@@ -70,6 +83,8 @@ export type StoredWorkOrder = {
   stages: string[];
   status: string;
   totalLabel: string;
+  lines: SharedQuoteLine[];
+  purchaseSuggestions: PurchaseSuggestion[];
   createdAt: string;
 };
 
@@ -172,6 +187,101 @@ const initialQuoteDraft: QuoteDraft = {
   lines: [],
 };
 
+function parseManagedStock(stockLabel: string) {
+  const digits = stockLabel.replace(/[^\d]/g, "");
+
+  if (!digits) {
+    return null;
+  }
+
+  const parsed = Number(digits);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getCatalogItemContext(line: SharedQuoteLine) {
+  return catalogRecords.find(
+    (record) => record.code === line.code || record.name === line.name,
+  );
+}
+
+function inferSuggestedSupplier(line: SharedQuoteLine) {
+  const catalogItem = getCatalogItemContext(line);
+  const haystack = `${line.name} ${line.type} ${catalogItem?.category ?? ""}`.toLowerCase();
+
+  if (
+    haystack.includes("nova") ||
+    haystack.includes("aseo") ||
+    haystack.includes("sabanilla")
+  ) {
+    return (
+      supplierRecords.find((record) => record.name === "Nova Industrial Chile")?.name ??
+      supplierRecords[0].name
+    );
+  }
+
+  if (
+    haystack.includes("pvc") ||
+    haystack.includes("letrero") ||
+    haystack.includes("senaletica") ||
+    haystack.includes("trovisel")
+  ) {
+    return (
+      supplierRecords.find((record) => record.name === "PVC y Senaletica SPA")?.name ??
+      supplierRecords[0].name
+    );
+  }
+
+  return (
+    supplierRecords.find((record) => record.name === "Papeles Bio Bio")?.name ??
+    supplierRecords[0].name
+  );
+}
+
+function estimateSuggestedUnitCost(line: SharedQuoteLine) {
+  const catalogItem = getCatalogItemContext(line);
+  const basePrice = catalogItem ? parseClp(catalogItem.price) : line.unitPrice;
+  return Math.max(0, Math.round(basePrice * 0.72));
+}
+
+export function buildPurchaseSuggestionsFromQuoteLines(lines: SharedQuoteLine[]) {
+  return lines.flatMap<PurchaseSuggestion>((line) => {
+    const availableStock = parseManagedStock(line.stock);
+
+    if (availableStock === null || line.quantity <= availableStock) {
+      return [];
+    }
+
+    const shortageQuantity = line.quantity - availableStock;
+
+    return [
+      {
+        id: `${line.id}-purchase`,
+        item: line.name,
+        sourceCode: line.code,
+        sourceLineId: line.id,
+        requiredQuantity: line.quantity,
+        availableStock,
+        shortageQuantity,
+        suggestedSupplier: inferSuggestedSupplier(line),
+        unitCost: estimateSuggestedUnitCost(line),
+        reason: `Reposicion para cubrir faltante de ${line.name}`,
+      },
+    ];
+  });
+}
+
+export function buildPurchaseLinesFromSuggestions(
+  suggestions: PurchaseSuggestion[],
+): StoredPurchaseLine[] {
+  return suggestions.map((suggestion) => ({
+    id: generateId("purchase-line"),
+    item: suggestion.item,
+    quantity: suggestion.shortageQuantity,
+    unitCost: suggestion.unitCost,
+    purpose: suggestion.reason,
+  }));
+}
+
 function generateId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -204,6 +314,38 @@ function computeQuoteTotals(draft: QuoteDraft) {
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
+function normalizeQuoteDraft(rawDraft: Partial<QuoteDraft> | undefined): QuoteDraft {
+  return {
+    ...initialQuoteDraft,
+    ...rawDraft,
+    lines: Array.isArray(rawDraft?.lines) ? rawDraft.lines : [],
+  };
+}
+
+function normalizeSavedQuote(rawQuote: Partial<SavedQuote>): SavedQuote {
+  return {
+    ...(rawQuote as SavedQuote),
+    lines: Array.isArray(rawQuote.lines) ? rawQuote.lines : [],
+  };
+}
+
+function normalizeWorkOrder(rawWorkOrder: Partial<StoredWorkOrder>): StoredWorkOrder {
+  return {
+    ...(rawWorkOrder as StoredWorkOrder),
+    lines: Array.isArray(rawWorkOrder.lines) ? rawWorkOrder.lines : [],
+    purchaseSuggestions: Array.isArray(rawWorkOrder.purchaseSuggestions)
+      ? rawWorkOrder.purchaseSuggestions
+      : [],
+  };
+}
+
+function normalizePurchase(rawPurchase: Partial<StoredPurchase>): StoredPurchase {
+  return {
+    ...(rawPurchase as StoredPurchase),
+    lines: Array.isArray(rawPurchase.lines) ? rawPurchase.lines : [],
+  };
+}
+
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [quoteDraft, setQuoteDraft] = useState<QuoteDraft>(initialQuoteDraft);
   const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>([]);
@@ -220,11 +362,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const parsedState = JSON.parse(rawState) as PersistedState;
-      setQuoteDraft(parsedState.quoteDraft ?? initialQuoteDraft);
-      setSavedQuotes(parsedState.savedQuotes ?? []);
-      setWorkOrders(parsedState.workOrders ?? []);
-      setPurchases(parsedState.purchases ?? []);
+      const parsedState = JSON.parse(rawState) as Partial<PersistedState>;
+      setQuoteDraft(normalizeQuoteDraft(parsedState.quoteDraft));
+      setSavedQuotes(
+        Array.isArray(parsedState.savedQuotes)
+          ? parsedState.savedQuotes.map((quote) => normalizeSavedQuote(quote))
+          : [],
+      );
+      setWorkOrders(
+        Array.isArray(parsedState.workOrders)
+          ? parsedState.workOrders.map((order) => normalizeWorkOrder(order))
+          : [],
+      );
+      setPurchases(
+        Array.isArray(parsedState.purchases)
+          ? parsedState.purchases.map((purchase) => normalizePurchase(purchase))
+          : [],
+      );
       setInventoryMovements(parsedState.inventoryMovements ?? []);
     } finally {
       setHydrated(true);
@@ -307,7 +461,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       subtotal: totals.subtotal,
       tax: totals.tax,
       total: totals.total,
-      lines: quoteDraft.lines,
+      lines: quoteDraft.lines.map((line) => ({ ...line })),
       status: "Sincronizada",
       createdAt: new Date().toISOString(),
     };
@@ -328,6 +482,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     stages: string[];
     totalLabel: string;
   }) {
+    const sourceQuote = savedQuotes.find((quote) => quote.number === input.quoteNumber);
+    const inheritedLines = sourceQuote?.lines.map((line) => ({ ...line })) ?? [];
+    const purchaseSuggestions = buildPurchaseSuggestionsFromQuoteLines(inheritedLines);
     const workOrder: StoredWorkOrder = {
       id: generateId("wo"),
       number: `OT-LOCAL-${String(workOrders.length + 1).padStart(3, "0")}`,
@@ -342,6 +499,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       stages: input.stages,
       status: "Planificada",
       totalLabel: input.totalLabel,
+      lines: inheritedLines,
+      purchaseSuggestions: purchaseSuggestions.map((suggestion) => ({ ...suggestion })),
       createdAt: new Date().toISOString(),
     };
 
