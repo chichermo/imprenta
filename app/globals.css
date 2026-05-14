@@ -1049,6 +1049,105 @@ textarea {
   font-weight: 800;
 }
 
+.report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px;
+  clip-path: var(--cut-lg);
+  background:
+    linear-gradient(135deg, rgba(90, 199, 234, 0.1), transparent 45%),
+    var(--paper);
+  border: 1px solid var(--border-paper);
+  box-shadow: var(--shadow-paper);
+}
+
+.report-toolbar__copy {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.report-toolbar__copy h3 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  line-height: 1.1;
+}
+
+.report-toolbar__copy p:last-child {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.report-toolbar__controls {
+  display: grid;
+  gap: 14px;
+  min-width: min(100%, 300px);
+}
+
+.report-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.chart-panel {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  clip-path: var(--cut-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 35%),
+    linear-gradient(135deg, rgba(17, 32, 51, 0.04), transparent 50%),
+    var(--paper-strong);
+  border: 1px solid var(--border-paper);
+  box-shadow: var(--shadow-paper);
+}
+
+.chart-panel--wide {
+  grid-column: span 2;
+}
+
+.chart-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-panel__header h3 {
+  margin: 0;
+}
+
+.chart-caption {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  clip-path: var(--cut-md);
+  background: rgba(17, 32, 51, 0.06);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chart-surface {
+  width: 100%;
+  min-height: 320px;
+  padding: 12px 8px 0;
+  border-top: 1px dashed rgba(17, 32, 51, 0.14);
+}
+
 @media (min-width: 1281px) {
   .builder-pane--summary {
     position: sticky;
@@ -1069,6 +1168,7 @@ textarea {
   .quote-workbench,
   .quote-workspace-grid,
   .workflow-stage-list,
+  .chart-grid,
   .shell-highlights,
   .metric-grid,
   .collection-grid,
@@ -1098,6 +1198,7 @@ textarea {
   .quote-workspace-grid,
   .form-grid,
   .workflow-stage-list,
+  .chart-grid,
   .shell-highlights,
   .metric-grid,
   .collection-grid,
@@ -1113,5 +1214,9 @@ textarea {
 
   .nav-link {
     min-height: auto;
+  }
+
+  .chart-panel--wide {
+    grid-column: auto;
   }
 }
