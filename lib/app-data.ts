@@ -119,7 +119,7 @@ export const navigationSections: NavSection[] = [
         href: "/reportes",
         label: "Reportes",
         shortLabel: "BI",
-        description: "Ventas, margenes, clientes clave y tableros de gestion.",
+        description: "Graficos, ventas, clientes clave y tableros de gestion.",
       },
     ],
   },
@@ -131,6 +131,7 @@ export const quickActions = [
   { href: "/cotizaciones", label: "Nueva venta" },
   { href: "/ordenes-trabajo", label: "Produccion" },
   { href: "/compras", label: "Reposicion" },
+  { href: "/reportes", label: "Ver graficos" },
   { href: "/facturacion", label: "Facturacion" },
 ];
 

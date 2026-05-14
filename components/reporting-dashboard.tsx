@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -39,6 +39,7 @@ export function ReportingDashboard() {
   const { inventoryMovements, liveStats, purchases, savedQuotes, workOrders } = useAppState();
   const [period, setPeriod] = useState<PeriodPreset>("6m");
   const [isExporting, setIsExporting] = useState<"pdf" | "excel" | null>(null);
+  const [chartsReady, setChartsReady] = useState(false);
 
   const trendRef = useRef<HTMLDivElement>(null);
   const operationsRef = useRef<HTMLDivElement>(null);
@@ -80,6 +81,14 @@ export function ReportingDashboard() {
     },
   };
 
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setChartsReady(true);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
+
   async function handleExportPdf() {
     try {
       setIsExporting("pdf");
@@ -107,6 +116,11 @@ export function ReportingDashboard() {
           <p>
             Filtra por periodo, revisa tendencias comerciales y exporta resumenes con datos y
             graficos incluidos.
+          </p>
+          <p className="report-toolbar__hint">
+            Los graficos aparecen justo debajo de este bloque: &quot;Ventas vs costos&quot;,
+            &quot;Embudo operativo&quot;, &quot;Venta por categoria&quot; y
+            &quot;Top clientes por facturacion&quot;.
           </p>
         </div>
 
@@ -200,44 +214,51 @@ export function ReportingDashboard() {
             <span className="chart-caption">{periodLabel}</span>
           </div>
           <div className="chart-surface">
-            <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={filteredSnapshots}>
-                <defs>
-                  <linearGradient id="salesFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#29b7b0" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#29b7b0" stopOpacity={0.05} />
-                  </linearGradient>
-                  <linearGradient id="costFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#cf5a5f" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#cf5a5f" stopOpacity={0.03} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgba(17, 32, 51, 0.1)" strokeDasharray="4 6" />
-                <XAxis dataKey="label" stroke="#536277" />
-                <YAxis stroke="#536277" tickFormatter={(value) => `${Math.round(value / 1000000)}M`} />
-                <Tooltip
-                  formatter={(value) => formatClp(Number(value ?? 0))}
-                  labelStyle={{ color: "#112033" }}
-                />
-                <Legend />
-                <Area
-                  dataKey="revenue"
-                  fill="url(#salesFill)"
-                  name="Ventas"
-                  stroke="#29b7b0"
-                  strokeWidth={2}
-                  type="monotone"
-                />
-                <Area
-                  dataKey="costs"
-                  fill="url(#costFill)"
-                  name="Costos"
-                  stroke="#cf5a5f"
-                  strokeWidth={2}
-                  type="monotone"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartsReady ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <AreaChart data={filteredSnapshots}>
+                  <defs>
+                    <linearGradient id="salesFill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="#29b7b0" stopOpacity={0.45} />
+                      <stop offset="95%" stopColor="#29b7b0" stopOpacity={0.05} />
+                    </linearGradient>
+                    <linearGradient id="costFill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="#cf5a5f" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#cf5a5f" stopOpacity={0.03} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(17, 32, 51, 0.1)" strokeDasharray="4 6" />
+                  <XAxis dataKey="label" stroke="#536277" />
+                  <YAxis
+                    stroke="#536277"
+                    tickFormatter={(value) => `${Math.round(value / 1000000)}M`}
+                  />
+                  <Tooltip
+                    formatter={(value) => formatClp(Number(value ?? 0))}
+                    labelStyle={{ color: "#112033" }}
+                  />
+                  <Legend />
+                  <Area
+                    dataKey="revenue"
+                    fill="url(#salesFill)"
+                    name="Ventas"
+                    stroke="#29b7b0"
+                    strokeWidth={2}
+                    type="monotone"
+                  />
+                  <Area
+                    dataKey="costs"
+                    fill="url(#costFill)"
+                    name="Costos"
+                    stroke="#cf5a5f"
+                    strokeWidth={2}
+                    type="monotone"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chart-placeholder">Cargando grafico...</div>
+            )}
           </div>
         </article>
 
@@ -250,19 +271,23 @@ export function ReportingDashboard() {
             <span className="chart-caption">Cotizacion a entrega</span>
           </div>
           <div className="chart-surface">
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={operationsBreakdown}>
-                <CartesianGrid stroke="rgba(17, 32, 51, 0.1)" strokeDasharray="4 6" />
-                <XAxis dataKey="label" stroke="#536277" />
-                <YAxis stroke="#536277" />
-                <Tooltip labelStyle={{ color: "#112033" }} />
-                <Legend />
-                <Bar dataKey="quotesCreated" fill="#5ac7ea" name="Cotizadas" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="quotesApproved" fill="#29b7b0" name="Aprobadas" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="workOrders" fill="#d1911f" name="OT" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="deliveries" fill="#59834d" name="Entregas" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {chartsReady ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={operationsBreakdown}>
+                  <CartesianGrid stroke="rgba(17, 32, 51, 0.1)" strokeDasharray="4 6" />
+                  <XAxis dataKey="label" stroke="#536277" />
+                  <YAxis stroke="#536277" />
+                  <Tooltip labelStyle={{ color: "#112033" }} />
+                  <Legend />
+                  <Bar dataKey="quotesCreated" fill="#5ac7ea" name="Cotizadas" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="quotesApproved" fill="#29b7b0" name="Aprobadas" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="workOrders" fill="#d1911f" name="OT" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="deliveries" fill="#59834d" name="Entregas" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chart-placeholder">Cargando grafico...</div>
+            )}
           </div>
         </article>
 
@@ -275,26 +300,30 @@ export function ReportingDashboard() {
             <span className="chart-caption">Participacion</span>
           </div>
           <div className="chart-surface">
-            <ResponsiveContainer width="100%" height={320}>
-              <PieChart>
-                <Pie
-                  cx="50%"
-                  cy="50%"
-                  data={categoryBreakdown}
-                  dataKey="revenue"
-                  innerRadius={58}
-                  nameKey="category"
-                  outerRadius={106}
-                  paddingAngle={3}
-                >
-                  {categoryBreakdown.map((entry, index) => (
-                    <Cell fill={chartPalette[index % chartPalette.length]} key={entry.category} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatClp(Number(value ?? 0))} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {chartsReady ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <PieChart>
+                  <Pie
+                    cx="50%"
+                    cy="50%"
+                    data={categoryBreakdown}
+                    dataKey="revenue"
+                    innerRadius={58}
+                    nameKey="category"
+                    outerRadius={106}
+                    paddingAngle={3}
+                  >
+                    {categoryBreakdown.map((entry, index) => (
+                      <Cell fill={chartPalette[index % chartPalette.length]} key={entry.category} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatClp(Number(value ?? 0))} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chart-placeholder">Cargando grafico...</div>
+            )}
           </div>
         </article>
 
@@ -307,34 +336,41 @@ export function ReportingDashboard() {
             <span className="chart-caption">Ranking filtrado</span>
           </div>
           <div className="chart-surface">
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={customerRanking}>
-                <CartesianGrid stroke="rgba(17, 32, 51, 0.1)" strokeDasharray="4 6" />
-                <XAxis dataKey="customer" stroke="#536277" />
-                <YAxis stroke="#536277" tickFormatter={(value) => `${Math.round(value / 1000000)}M`} />
-                <Tooltip
-                  formatter={(value) => formatClp(Number(value ?? 0))}
-                  labelStyle={{ color: "#112033" }}
-                />
-                <Legend />
-                <Line
-                  dataKey="revenue"
-                  dot={{ fill: "#29b7b0", r: 4 }}
-                  name="Ventas"
-                  stroke="#29b7b0"
-                  strokeWidth={3}
-                  type="monotone"
-                />
-                <Line
-                  dataKey="outstanding"
-                  dot={{ fill: "#cf5a5f", r: 4 }}
-                  name="Saldo pendiente"
-                  stroke="#cf5a5f"
-                  strokeWidth={2}
-                  type="monotone"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {chartsReady ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <LineChart data={customerRanking}>
+                  <CartesianGrid stroke="rgba(17, 32, 51, 0.1)" strokeDasharray="4 6" />
+                  <XAxis dataKey="customer" stroke="#536277" />
+                  <YAxis
+                    stroke="#536277"
+                    tickFormatter={(value) => `${Math.round(value / 1000000)}M`}
+                  />
+                  <Tooltip
+                    formatter={(value) => formatClp(Number(value ?? 0))}
+                    labelStyle={{ color: "#112033" }}
+                  />
+                  <Legend />
+                  <Line
+                    dataKey="revenue"
+                    dot={{ fill: "#29b7b0", r: 4 }}
+                    name="Ventas"
+                    stroke="#29b7b0"
+                    strokeWidth={3}
+                    type="monotone"
+                  />
+                  <Line
+                    dataKey="outstanding"
+                    dot={{ fill: "#cf5a5f", r: 4 }}
+                    name="Saldo pendiente"
+                    stroke="#cf5a5f"
+                    strokeWidth={2}
+                    type="monotone"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chart-placeholder">Cargando grafico...</div>
+            )}
           </div>
         </article>
       </section>

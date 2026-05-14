@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: "Distribuidora San Pablo S.A.",
   description:
     "Sistema comercial para cotizaciones, ventas, inventario y futura facturacion electronica en Chile.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
