@@ -2,38 +2,28 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  SharedQuoteLine,
+  useAppState,
+} from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
 import { formatClp, parseClp, parseNumericText, parseStockText } from "@/lib/formatters";
 import { catalogRecords, customerRecords } from "@/lib/mock-data";
 
-type LineSource = "catalogo" | "custom";
-
-type DraftLine = {
-  id: string;
-  source: LineSource;
-  code: string;
-  name: string;
-  type: string;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
-  discountPercent: number;
-  notes: string;
-  stock: string;
-};
-
 const baseLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function QuoteWorkbench() {
-  const [selectedCustomer, setSelectedCustomer] = useState(customerRecords[0].businessName);
-  const [validityDays, setValidityDays] = useState("7");
-  const [deliveryWindow, setDeliveryWindow] = useState("5 dias habiles");
-  const [quoteNote, setQuoteNote] = useState(
-    "Cotizacion referencial sujeta a confirmacion de stock y aprobacion tecnica.",
-  );
-  const [includeVat, setIncludeVat] = useState(true);
+  const {
+    addQuoteLine,
+    quoteDraft,
+    quoteDraftTotals,
+    removeQuoteLine,
+    saveQuoteDraft,
+    savedQuotes,
+    updateQuoteDraft,
+  } = useAppState();
 
-  const [lineSource, setLineSource] = useState<LineSource>("catalogo");
+  const [lineSource, setLineSource] = useState<SharedQuoteLine["source"]>("catalogo");
   const [selectedItemCode, setSelectedItemCode] = useState(catalogRecords[0].code);
   const [quantity, setQuantity] = useState("1");
   const [discountPercent, setDiscountPercent] = useState("0");
@@ -43,68 +33,14 @@ export function QuoteWorkbench() {
   const [customUnit, setCustomUnit] = useState("m2");
   const [customPrice, setCustomPrice] = useState("28000");
   const [customStock, setCustomStock] = useState("A pedido");
+  const [lastSavedQuoteNumber, setLastSavedQuoteNumber] = useState<string | null>(null);
 
   const selectedCustomerRecord =
-    customerRecords.find((customer) => customer.businessName === selectedCustomer) ??
+    customerRecords.find((customer) => customer.businessName === quoteDraft.customer) ??
     customerRecords[0];
 
   const selectedCatalogItem =
     catalogRecords.find((item) => item.code === selectedItemCode) ?? catalogRecords[0];
-
-  const [lines, setLines] = useState<DraftLine[]>([
-    {
-      id: "seed-1",
-      source: "catalogo",
-      code: catalogRecords[0].code,
-      name: catalogRecords[0].name,
-      type: catalogRecords[0].type,
-      unit: catalogRecords[0].unit,
-      quantity: 4,
-      unitPrice: parseClp(catalogRecords[0].price),
-      discountPercent: 0,
-      notes: "Consumo recurrente para reposicion semanal.",
-      stock: catalogRecords[0].stock,
-    },
-    {
-      id: "seed-2",
-      source: "catalogo",
-      code: catalogRecords[2].code,
-      name: catalogRecords[2].name,
-      type: catalogRecords[2].type,
-      unit: catalogRecords[2].unit,
-      quantity: 12,
-      unitPrice: parseClp(catalogRecords[2].price),
-      discountPercent: 5,
-      notes: "Talonarios para recepcion con duplicado.",
-      stock: catalogRecords[2].stock,
-    },
-  ]);
-
-  const quoteTotals = useMemo(() => {
-    const netSubtotal = lines.reduce((total, line) => {
-      const grossLine = line.quantity * line.unitPrice;
-      const lineDiscount = grossLine * (line.discountPercent / 100);
-      return total + (grossLine - lineDiscount);
-    }, 0);
-
-    const tax = includeVat ? Math.round(netSubtotal * 0.19) : 0;
-    const grandTotal = netSubtotal + tax;
-    const hasProductionWork = lines.some(
-      (line) => line.type === "Servicio" || line.type === "Trabajo",
-    );
-    const requiresPurchaseReview = lines.some((line) => {
-      const availableStock = parseStockText(line.stock);
-      return availableStock > 0 && line.quantity > availableStock;
-    });
-
-    return {
-      netSubtotal,
-      tax,
-      grandTotal,
-      hasProductionWork,
-      requiresPurchaseReview,
-    };
-  }, [includeVat, lines]);
 
   function resetEntryForm() {
     setQuantity("1");
@@ -122,9 +58,7 @@ export function QuoteWorkbench() {
     const parsedDiscount = Math.max(0, parseNumericText(discountPercent));
 
     if (lineSource === "catalogo") {
-      setLines((currentLines) => [
-        ...currentLines,
-        {
+      addQuoteLine({
           id: baseLineId(),
           source: "catalogo",
           code: selectedCatalogItem.code,
@@ -136,15 +70,12 @@ export function QuoteWorkbench() {
           discountPercent: parsedDiscount,
           notes: technicalNotes,
           stock: selectedCatalogItem.stock,
-        },
-      ]);
+        });
       resetEntryForm();
       return;
     }
 
-    setLines((currentLines) => [
-      ...currentLines,
-      {
+    addQuoteLine({
         id: baseLineId(),
         source: "custom",
         code: "CUSTOM",
@@ -156,13 +87,15 @@ export function QuoteWorkbench() {
         discountPercent: parsedDiscount,
         notes: technicalNotes,
         stock: customStock.trim() || "A pedido",
-      },
-    ]);
+      });
     resetEntryForm();
   }
 
-  function removeLine(lineId: string) {
-    setLines((currentLines) => currentLines.filter((line) => line.id !== lineId));
+  function handleSaveQuote() {
+    const savedQuote = saveQuoteDraft();
+    if (savedQuote) {
+      setLastSavedQuoteNumber(savedQuote.number);
+    }
   }
 
   return (
@@ -176,9 +109,12 @@ export function QuoteWorkbench() {
           <div className="builder-status-row">
             <StatusPill label="Borrador activo" tone="neutral" />
             <StatusPill
-              label={includeVat ? "IVA 19% activo" : "Sin IVA"}
-              tone={includeVat ? "info" : "warning"}
+              label={quoteDraft.includeVat ? "IVA 19% activo" : "Sin IVA"}
+              tone={quoteDraft.includeVat ? "info" : "warning"}
             />
+            {lastSavedQuoteNumber ? (
+              <StatusPill label={`Ultima sync ${lastSavedQuoteNumber}`} tone="success" />
+            ) : null}
           </div>
         </div>
 
@@ -194,8 +130,8 @@ export function QuoteWorkbench() {
                 <span className="field-label">Cliente</span>
                 <select
                   className="field-control"
-                  onChange={(event) => setSelectedCustomer(event.target.value)}
-                  value={selectedCustomer}
+                  onChange={(event) => updateQuoteDraft({ customer: event.target.value })}
+                  value={quoteDraft.customer}
                 >
                   {customerRecords.map((customer) => (
                     <option key={customer.businessName} value={customer.businessName}>
@@ -210,9 +146,9 @@ export function QuoteWorkbench() {
                 <input
                   className="field-control"
                   min="1"
-                  onChange={(event) => setValidityDays(event.target.value)}
+                  onChange={(event) => updateQuoteDraft({ validityDays: event.target.value })}
                   type="number"
-                  value={validityDays}
+                  value={quoteDraft.validityDays}
                 />
               </label>
 
@@ -220,8 +156,8 @@ export function QuoteWorkbench() {
                 <span className="field-label">Ventana de entrega</span>
                 <input
                   className="field-control"
-                  onChange={(event) => setDeliveryWindow(event.target.value)}
-                  value={deliveryWindow}
+                  onChange={(event) => updateQuoteDraft({ deliveryWindow: event.target.value })}
+                  value={quoteDraft.deliveryWindow}
                 />
               </label>
 
@@ -229,9 +165,9 @@ export function QuoteWorkbench() {
                 <span className="field-label">Observaciones comerciales</span>
                 <textarea
                   className="field-control field-control--textarea"
-                  onChange={(event) => setQuoteNote(event.target.value)}
+                  onChange={(event) => updateQuoteDraft({ note: event.target.value })}
                   rows={3}
-                  value={quoteNote}
+                  value={quoteDraft.note}
                 />
               </label>
             </div>
@@ -361,10 +297,13 @@ export function QuoteWorkbench() {
               </button>
               <button
                 className="ghost-button"
-                onClick={() => setIncludeVat((current) => !current)}
+                onClick={() => updateQuoteDraft({ includeVat: !quoteDraft.includeVat })}
                 type="button"
               >
-                {includeVat ? "Quitar IVA" : "Agregar IVA"}
+                {quoteDraft.includeVat ? "Quitar IVA" : "Agregar IVA"}
+              </button>
+              <button className="ghost-button" onClick={handleSaveQuote} type="button">
+                Guardar cotizacion
               </button>
             </div>
           </div>
@@ -377,7 +316,7 @@ export function QuoteWorkbench() {
           </div>
 
           <div className="quote-line-list">
-            {lines.map((line) => {
+            {quoteDraft.lines.map((line) => {
               const grossLine = line.quantity * line.unitPrice;
               const discountAmount = grossLine * (line.discountPercent / 100);
               const netLine = grossLine - discountAmount;
@@ -395,7 +334,7 @@ export function QuoteWorkbench() {
                     </div>
                     <button
                       className="quote-line-card__remove"
-                      onClick={() => removeLine(line.id)}
+                      onClick={() => removeQuoteLine(line.id)}
                       type="button"
                     >
                       Quitar
@@ -454,39 +393,41 @@ export function QuoteWorkbench() {
             </div>
             <div className="summary-list__row">
               <span>Validez</span>
-              <strong>{validityDays} dias</strong>
+              <strong>{quoteDraft.validityDays} dias</strong>
             </div>
             <div className="summary-list__row">
               <span>Entrega estimada</span>
-              <strong>{deliveryWindow}</strong>
+              <strong>{quoteDraft.deliveryWindow}</strong>
             </div>
           </div>
 
           <div className="quote-total-card">
             <div className="summary-list__row">
               <span>Neto</span>
-              <strong>{formatClp(quoteTotals.netSubtotal)}</strong>
+              <strong>{formatClp(quoteDraftTotals.subtotal)}</strong>
             </div>
             <div className="summary-list__row">
               <span>IVA</span>
-              <strong>{formatClp(quoteTotals.tax)}</strong>
+              <strong>{formatClp(quoteDraftTotals.tax)}</strong>
             </div>
             <div className="summary-list__row summary-list__row--grand">
               <span>Total</span>
-              <strong>{formatClp(quoteTotals.grandTotal)}</strong>
+              <strong>{formatClp(quoteDraftTotals.total)}</strong>
             </div>
           </div>
 
           <div className="summary-signals">
             <StatusPill
-              label={quoteTotals.hasProductionWork ? "Genera OT" : "Venta directa"}
-              tone={quoteTotals.hasProductionWork ? "warning" : "success"}
+              label={quoteDraftTotals.hasProductionWork ? "Genera OT" : "Venta directa"}
+              tone={quoteDraftTotals.hasProductionWork ? "warning" : "success"}
             />
             <StatusPill
               label={
-                quoteTotals.requiresPurchaseReview ? "Revisar stock y OC" : "Stock controlado"
+                quoteDraftTotals.requiresPurchaseReview
+                  ? "Revisar stock y OC"
+                  : "Stock controlado"
               }
-              tone={quoteTotals.requiresPurchaseReview ? "danger" : "success"}
+              tone={quoteDraftTotals.requiresPurchaseReview ? "danger" : "success"}
             />
           </div>
         </div>
@@ -510,6 +451,33 @@ export function QuoteWorkbench() {
               <strong>3. Revisar abastecimiento</strong>
               <p>Si una linea supera stock disponible, disparar orden de compra o reserva.</p>
             </article>
+          </div>
+        </div>
+
+        <div className="quote-summary-card quote-summary-card--secondary">
+          <div className="quote-summary-card__header">
+            <p className="eyebrow">Cotizaciones sincronizadas</p>
+            <h3>{savedQuotes.length}</h3>
+          </div>
+
+          <div className="timeline-list">
+            {savedQuotes.length === 0 ? (
+              <article>
+                <strong>Aun no hay cotizaciones guardadas</strong>
+                <p>Guarda el borrador actual para que quede disponible en Produccion y Compras.</p>
+              </article>
+            ) : (
+              savedQuotes.slice(0, 3).map((quote) => (
+                <article key={quote.id}>
+                  <strong>
+                    {quote.number} · {quote.customer}
+                  </strong>
+                  <p>
+                    {formatClp(quote.total)} · vence {quote.validUntilLabel}
+                  </p>
+                </article>
+              ))
+            )}
           </div>
         </div>
       </aside>

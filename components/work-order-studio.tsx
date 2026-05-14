@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  formatStoredQuoteTotal,
+  useAppState,
+} from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
 import { quoteRecords } from "@/lib/mock-data";
 
@@ -41,7 +45,9 @@ function createStageTemplates(area: string) {
 }
 
 export function WorkOrderStudio() {
-  const [selectedQuote, setSelectedQuote] = useState(quoteRecords[0].number);
+  const { createWorkOrder, savedQuotes, workOrders } = useAppState();
+  const sharedQuoteSeed = savedQuotes[0]?.number ?? quoteRecords[0].number;
+  const [selectedQuote, setSelectedQuote] = useState(sharedQuoteSeed);
   const [area, setArea] = useState("Imprenta");
   const [responsible, setResponsible] = useState("Preprensa");
   const [proof, setProof] = useState("PDF digital");
@@ -50,10 +56,49 @@ export function WorkOrderStudio() {
   const [notes, setNotes] = useState(
     "Validar aprobacion del cliente antes de liberar a produccion.",
   );
+  const [lastCreated, setLastCreated] = useState<string | null>(null);
 
-  const quote = quoteRecords.find((record) => record.number === selectedQuote) ?? quoteRecords[0];
+  const quoteOptions = useMemo(() => {
+    const shared = savedQuotes.map((quote) => ({
+      number: quote.number,
+      customer: quote.customer,
+      totalLabel: formatStoredQuoteTotal(quote.total),
+      source: "Compartida",
+    }));
+
+    const fallback = quoteRecords
+      .filter((record) => !shared.some((sharedQuote) => sharedQuote.number === record.number))
+      .map((record) => ({
+        number: record.number,
+        customer: record.customer,
+        totalLabel: record.total,
+        source: "Mock",
+      }));
+
+    return [...shared, ...fallback];
+  }, [savedQuotes]);
+
+  const quote =
+    quoteOptions.find((record) => record.number === selectedQuote) ?? quoteOptions[0];
   const stageTemplates = useMemo(() => createStageTemplates(area), [area]);
   const generatedNumber = `OT-${selectedQuote.replace("COT-", "")}`;
+
+  function handleCreateWorkOrder() {
+    const workOrder = createWorkOrder({
+      quoteNumber: quote.number,
+      customer: quote.customer,
+      area,
+      responsible,
+      proof,
+      dueDate,
+      requiresInstallation,
+      notes,
+      stages: stageTemplates.map((stage) => stage.name),
+      totalLabel: quote.totalLabel,
+    });
+
+    setLastCreated(workOrder.number);
+  }
 
   return (
     <div className="quote-workbench">
@@ -75,9 +120,9 @@ export function WorkOrderStudio() {
                 onChange={(event) => setSelectedQuote(event.target.value)}
                 value={selectedQuote}
               >
-                {quoteRecords.map((record) => (
+                {quoteOptions.map((record) => (
                   <option key={record.number} value={record.number}>
-                    {record.number} · {record.customer}
+                    {record.number} · {record.customer} · {record.source}
                   </option>
                 ))}
               </select>
@@ -158,6 +203,9 @@ export function WorkOrderStudio() {
             >
               {requiresInstallation ? "Incluye instalacion en terreno" : "Sin instalacion"}
             </button>
+            <button className="action-button" onClick={handleCreateWorkOrder} type="button">
+              Crear OT en flujo compartido
+            </button>
           </div>
         </div>
 
@@ -191,7 +239,7 @@ export function WorkOrderStudio() {
         <div className="quote-summary-card">
           <div className="quote-summary-card__header">
             <p className="eyebrow">Orden generada</p>
-            <h3>{generatedNumber}</h3>
+            <h3>{lastCreated ?? generatedNumber}</h3>
           </div>
 
           <div className="summary-list">
@@ -217,7 +265,7 @@ export function WorkOrderStudio() {
             </div>
             <div className="summary-list__row">
               <span>Valor referencial</span>
-              <strong>{quote.total}</strong>
+              <strong>{quote.totalLabel}</strong>
             </div>
           </div>
 
@@ -230,6 +278,33 @@ export function WorkOrderStudio() {
           </div>
 
           <p>{notes}</p>
+        </div>
+
+        <div className="quote-summary-card quote-summary-card--secondary">
+          <div className="quote-summary-card__header">
+            <p className="eyebrow">OT sincronizadas</p>
+            <h3>{workOrders.length}</h3>
+          </div>
+
+          <div className="timeline-list">
+            {workOrders.length === 0 ? (
+              <article>
+                <strong>No hay ordenes creadas aun</strong>
+                <p>Cuando generes una OT aqui, quedara visible para el resto del flujo.</p>
+              </article>
+            ) : (
+              workOrders.slice(0, 3).map((order) => (
+                <article key={order.id}>
+                  <strong>
+                    {order.number} · {order.customer}
+                  </strong>
+                  <p>
+                    {order.area} · entrega {order.dueDate}
+                  </p>
+                </article>
+              ))
+            )}
+          </div>
         </div>
       </aside>
     </div>

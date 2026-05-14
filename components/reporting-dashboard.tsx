@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { useAppState } from "@/components/app-state-provider";
 import { exportReportToExcel, exportReportToPdf } from "@/lib/report-exports";
 import { formatClp } from "@/lib/formatters";
 import {
@@ -35,6 +36,7 @@ import {
 const chartPalette = ["#29b7b0", "#5ac7ea", "#d1911f", "#cf5a5f"];
 
 export function ReportingDashboard() {
+  const { inventoryMovements, liveStats, purchases, savedQuotes, workOrders } = useAppState();
   const [period, setPeriod] = useState<PeriodPreset>("6m");
   const [isExporting, setIsExporting] = useState<"pdf" | "excel" | null>(null);
 
@@ -153,6 +155,39 @@ export function ReportingDashboard() {
             <small>{summary.helper}</small>
           </article>
         ))}
+      </section>
+
+      <section className="mini-stat-grid">
+        <article className="mini-stat-card">
+          <span>Cotizaciones sincronizadas</span>
+          <strong>{liveStats.quotes}</strong>
+          <small>Guardadas desde la mesa comercial compartida.</small>
+        </article>
+        <article className="mini-stat-card">
+          <span>OT creadas</span>
+          <strong>{liveStats.workOrders}</strong>
+          <small>Ordenes nuevas derivadas desde cotizaciones sincronizadas.</small>
+        </article>
+        <article className="mini-stat-card">
+          <span>Compras activas</span>
+          <strong>{liveStats.purchases}</strong>
+          <small>Ordenes de compra nuevas planificadas desde el flujo.</small>
+        </article>
+        <article className="mini-stat-card">
+          <span>Movimientos stock</span>
+          <strong>{liveStats.inventoryMovements}</strong>
+          <small>Reservas, entradas o salidas registradas en navegador.</small>
+        </article>
+        <article className="mini-stat-card">
+          <span>Valor cotizado vivo</span>
+          <strong>{formatClp(liveStats.quoteValue)}</strong>
+          <small>Acumulado de cotizaciones sincronizadas en esta capa compartida.</small>
+        </article>
+        <article className="mini-stat-card">
+          <span>Valor compras vivo</span>
+          <strong>{formatClp(liveStats.purchaseValue)}</strong>
+          <small>Acumulado de compras nuevas registradas en el flujo operativo.</small>
+        </article>
       </section>
 
       <section className="chart-grid">
@@ -370,6 +405,75 @@ export function ReportingDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </article>
+      </div>
+
+      <div className="split-grid">
+        <article className="chart-panel">
+          <div className="chart-panel__header">
+            <div>
+              <p className="eyebrow">Actividad viva</p>
+              <h3>Flujo compartido actual</h3>
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Modulo</th>
+                  <th>Ultimo registro</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Cotizaciones</td>
+                  <td>{savedQuotes[0]?.number ?? "Sin registros"}</td>
+                  <td>{savedQuotes[0] ? `${savedQuotes[0].customer} · ${formatClp(savedQuotes[0].total)}` : "Guarda una cotizacion desde Comercial."}</td>
+                </tr>
+                <tr>
+                  <td>Produccion</td>
+                  <td>{workOrders[0]?.number ?? "Sin registros"}</td>
+                  <td>{workOrders[0] ? `${workOrders[0].customer} · ${workOrders[0].area}` : "Genera una OT desde Produccion."}</td>
+                </tr>
+                <tr>
+                  <td>Compras</td>
+                  <td>{purchases[0]?.number ?? "Sin registros"}</td>
+                  <td>{purchases[0] ? `${purchases[0].supplier} · ${formatClp(purchases[0].total)}` : "Guarda una OC desde Compras."}</td>
+                </tr>
+                <tr>
+                  <td>Inventario</td>
+                  <td>{inventoryMovements[0]?.reference ?? "Sin registros"}</td>
+                  <td>{inventoryMovements[0] ? `${inventoryMovements[0].operation} · ${inventoryMovements[0].item}` : "Aplica un movimiento en Inventario."}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article className="chart-panel">
+          <div className="chart-panel__header">
+            <div>
+              <p className="eyebrow">Notas del modelo</p>
+              <h3>Como se conectan hoy los modulos</h3>
+            </div>
+          </div>
+
+          <div className="timeline-list">
+            <article>
+              <strong>1. Cotizacion sincronizada</strong>
+              <p>Se guarda en la capa compartida y queda disponible inmediatamente en Produccion y Reportes.</p>
+            </article>
+            <article>
+              <strong>2. OT o compra compartida</strong>
+              <p>Las nuevas OT y OC se agregan al estado comun y alimentan el tablero vivo.</p>
+            </article>
+            <article>
+              <strong>3. Inventario compartido</strong>
+              <p>Los movimientos registrados afectan el stock simulado y el resumen operativo del dashboard.</p>
+            </article>
           </div>
         </article>
       </div>

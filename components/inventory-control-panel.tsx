@@ -2,42 +2,43 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  InventoryOperation,
+  useAppState,
+} from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
 import { parseNumericText, parseStockText } from "@/lib/formatters";
 import { catalogRecords } from "@/lib/mock-data";
 
-type InventoryOperation = "Reserva" | "Entrada" | "Salida" | "Ajuste";
-
-type DraftMovement = {
-  id: string;
-  item: string;
-  operation: InventoryOperation;
-  quantity: number;
-  reference: string;
-};
-
-const movementId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
 export function InventoryControlPanel() {
+  const {
+    addInventoryMovement,
+    inventoryMovements,
+    purchases,
+    removeInventoryMovement,
+    savedQuotes,
+    workOrders,
+  } = useAppState();
   const [item, setItem] = useState(catalogRecords[0].name);
   const [operation, setOperation] = useState<InventoryOperation>("Reserva");
   const [quantity, setQuantity] = useState("4");
   const [reference, setReference] = useState("COT-2026-041");
-  const [movements, setMovements] = useState<DraftMovement[]>([
-    {
-      id: "mov-1",
-      item: catalogRecords[0].name,
-      operation: "Reserva",
-      quantity: 4,
-      reference: "COT-2026-041",
-    },
-  ]);
+  const [lastCreatedMovement, setLastCreatedMovement] = useState<string | null>(null);
 
   const selectedItem = catalogRecords.find((record) => record.name === item) ?? catalogRecords[0];
+  const referenceOptions = useMemo(
+    () => [
+      "Manual",
+      ...savedQuotes.map((quote) => quote.number),
+      ...workOrders.map((order) => order.number),
+      ...purchases.map((purchase) => purchase.number),
+    ],
+    [purchases, savedQuotes, workOrders],
+  );
 
   const stockState = useMemo(() => {
     const baseStock = parseStockText(selectedItem.stock);
-    const simulated = movements.reduce((accumulator, movement) => {
+    const simulated = inventoryMovements.reduce((accumulator, movement) => {
       if (movement.item !== selectedItem.name) {
         return accumulator;
       }
@@ -58,24 +59,18 @@ export function InventoryControlPanel() {
       simulated,
       reorderPoint: 10,
     };
-  }, [movements, selectedItem]);
+  }, [inventoryMovements, selectedItem]);
 
   function addMovement() {
     const parsedQuantity = Math.max(1, parseNumericText(quantity));
-    setMovements((current) => [
-      ...current,
-      {
-        id: movementId(),
-        item,
-        operation,
-        quantity: parsedQuantity,
-        reference: reference.trim() || "Sin referencia",
-      },
-    ]);
-  }
+    const movement = addInventoryMovement({
+      item,
+      operation,
+      quantity: parsedQuantity,
+      reference: reference.trim() || "Sin referencia",
+    });
 
-  function removeMovement(id: string) {
-    setMovements((current) => current.filter((movement) => movement.id !== id));
+    setLastCreatedMovement(movement.reference);
   }
 
   return (
@@ -137,11 +132,17 @@ export function InventoryControlPanel() {
 
             <label className="field-group field-group--span-2">
               <span className="field-label">Referencia</span>
-              <input
+              <select
                 className="field-control"
                 onChange={(event) => setReference(event.target.value)}
                 value={reference}
-              />
+              >
+                {referenceOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -155,11 +156,17 @@ export function InventoryControlPanel() {
         <div className="builder-block">
           <div className="builder-block__header">
             <strong>Movimientos simulados</strong>
-            <p>Permite ensayar reservas, entradas y salidas antes de integrar la base definitiva.</p>
+              <p>Ahora quedan compartidos con el resto del flujo y persisten en navegador.</p>
           </div>
 
           <div className="quote-line-list">
-            {movements.map((movement) => (
+            {inventoryMovements.length === 0 ? (
+              <article className="quote-line-card">
+                <strong>Aun no hay movimientos compartidos</strong>
+                <p>Aplica un movimiento para sincronizarlo con stock y reportes.</p>
+              </article>
+            ) : (
+              inventoryMovements.map((movement) => (
               <article className="quote-line-card" key={movement.id}>
                 <div className="quote-line-card__top">
                   <div>
@@ -168,7 +175,7 @@ export function InventoryControlPanel() {
                   </div>
                   <button
                     className="quote-line-card__remove"
-                    onClick={() => removeMovement(movement.id)}
+                    onClick={() => removeInventoryMovement(movement.id)}
                     type="button"
                   >
                     Quitar
@@ -177,9 +184,11 @@ export function InventoryControlPanel() {
                 <div className="quote-line-card__meta">
                   <span>{movement.quantity} unidades</span>
                   <span>{movement.reference}</span>
+                  <span>{new Date(movement.createdAt).toLocaleDateString("es-CL")}</span>
                 </div>
               </article>
-            ))}
+            ))
+            )}
           </div>
         </div>
       </section>
@@ -188,7 +197,7 @@ export function InventoryControlPanel() {
         <div className="quote-summary-card">
           <div className="quote-summary-card__header">
             <p className="eyebrow">Estado simulado</p>
-            <h3>{selectedItem.name}</h3>
+            <h3>{lastCreatedMovement ?? selectedItem.name}</h3>
           </div>
 
           <div className="summary-list">

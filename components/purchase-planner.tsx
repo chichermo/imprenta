@@ -2,28 +2,26 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  StoredPurchaseLine,
+  useAppState,
+} from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
 import { formatClp, parseClp, parseNumericText } from "@/lib/formatters";
 import { catalogRecords, supplierRecords, stockAlerts } from "@/lib/mock-data";
 
-type PlannedLine = {
-  id: string;
-  item: string;
-  quantity: number;
-  unitCost: number;
-  purpose: string;
-};
-
 const lineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function PurchasePlanner() {
+  const { createPurchase, purchases, savedQuotes, workOrders } = useAppState();
   const [supplier, setSupplier] = useState(supplierRecords[0].name);
   const [item, setItem] = useState(catalogRecords[1].name);
   const [quantity, setQuantity] = useState("12");
   const [unitCost, setUnitCost] = useState("6200");
   const [purpose, setPurpose] = useState("Reposicion por stock critico");
   const [eta, setEta] = useState("2026-05-20");
-  const [lines, setLines] = useState<PlannedLine[]>([
+  const [sourceReference, setSourceReference] = useState("Manual");
+  const [lines, setLines] = useState<StoredPurchaseLine[]>([
     {
       id: "plan-1",
       item: catalogRecords[1].name,
@@ -32,8 +30,18 @@ export function PurchasePlanner() {
       purpose: "Reposicion por stock critico",
     },
   ]);
+  const [lastCreatedPurchase, setLastCreatedPurchase] = useState<string | null>(null);
 
   const selectedSupplier = supplierRecords.find((record) => record.name === supplier) ?? supplierRecords[0];
+  const sourceOptions = useMemo(
+    () => [
+      "Manual",
+      ...savedQuotes.map((quote) => quote.number),
+      ...workOrders.map((order) => order.number),
+    ],
+    [savedQuotes, workOrders],
+  );
+
   const suggestedItem =
     stockAlerts.find((alert) => alert.item === item)?.item ??
     catalogRecords.find((record) => record.name === item)?.name ??
@@ -75,6 +83,19 @@ export function PurchasePlanner() {
     ]);
   }
 
+  function handleCreatePurchase() {
+    const purchase = createPurchase({
+      supplier,
+      eta,
+      sourceReference,
+      lines,
+    });
+
+    if (purchase) {
+      setLastCreatedPurchase(purchase.number);
+    }
+  }
+
   function removeLine(id: string) {
     setLines((current) => current.filter((line) => line.id !== id));
   }
@@ -102,6 +123,21 @@ export function PurchasePlanner() {
                 {supplierRecords.map((record) => (
                   <option key={record.name} value={record.name}>
                     {record.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-group field-group--span-2">
+              <span className="field-label">Origen del requerimiento</span>
+              <select
+                className="field-control"
+                onChange={(event) => setSourceReference(event.target.value)}
+                value={sourceReference}
+              >
+                {sourceOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
                   </option>
                 ))}
               </select>
@@ -173,6 +209,9 @@ export function PurchasePlanner() {
             <button className="action-button" onClick={addLine} type="button">
               Agregar linea a OC
             </button>
+            <button className="ghost-button" onClick={handleCreatePurchase} type="button">
+              Guardar OC compartida
+            </button>
           </div>
         </div>
 
@@ -219,7 +258,7 @@ export function PurchasePlanner() {
         <div className="quote-summary-card">
           <div className="quote-summary-card__header">
             <p className="eyebrow">Resumen de compra</p>
-            <h3>{supplier}</h3>
+            <h3>{lastCreatedPurchase ?? supplier}</h3>
           </div>
 
           <div className="summary-list">
@@ -230,6 +269,10 @@ export function PurchasePlanner() {
             <div className="summary-list__row">
               <span>ETA comprometida</span>
               <strong>{eta}</strong>
+            </div>
+            <div className="summary-list__row">
+              <span>Origen</span>
+              <strong>{sourceReference}</strong>
             </div>
             <div className="summary-list__row">
               <span>Subtotal</span>
@@ -248,6 +291,33 @@ export function PurchasePlanner() {
           <div className="summary-signals">
             <StatusPill label={selectedSupplier.status} tone={selectedSupplier.tone} />
             <StatusPill label={`${lines.length} lineas`} tone="info" />
+          </div>
+        </div>
+
+        <div className="quote-summary-card quote-summary-card--secondary">
+          <div className="quote-summary-card__header">
+            <p className="eyebrow">OC sincronizadas</p>
+            <h3>{purchases.length}</h3>
+          </div>
+
+          <div className="timeline-list">
+            {purchases.length === 0 ? (
+              <article>
+                <strong>No hay OC guardadas aun</strong>
+                <p>Las compras guardadas aqui quedaran disponibles para el resto del flujo.</p>
+              </article>
+            ) : (
+              purchases.slice(0, 3).map((purchase) => (
+                <article key={purchase.id}>
+                  <strong>
+                    {purchase.number} · {purchase.supplier}
+                  </strong>
+                  <p>
+                    {formatClp(purchase.total)} · ETA {purchase.eta}
+                  </p>
+                </article>
+              ))
+            )}
           </div>
         </div>
       </aside>
