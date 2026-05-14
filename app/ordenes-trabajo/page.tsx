@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { SectionCard } from "@/components/section-card";
 import { StatusPill } from "@/components/status-pill";
+import { WorkOrderStudio } from "@/components/work-order-studio";
 import { workOrderRecords, workStages } from "@/lib/mock-data";
 
 export default function WorkOrdersPage() {
@@ -10,6 +11,8 @@ export default function WorkOrdersPage() {
       description="Seguimiento productivo para imprenta, gran formato, senaletica y encargos a medida."
     >
       <div className="content-grid">
+        <WorkOrderStudio />
+
         <SectionCard
           title="Cola de produccion"
           description="Idealmente esta vista se alimentara desde cotizaciones aprobadas."

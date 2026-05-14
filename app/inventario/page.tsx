@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { InventoryControlPanel } from "@/components/inventory-control-panel";
 import { SectionCard } from "@/components/section-card";
 import { StatusPill } from "@/components/status-pill";
 import { inventoryMovements, stockAlerts } from "@/lib/mock-data";
@@ -27,6 +28,8 @@ export default function InventoryPage() {
       description="Orientado a insumos clinicos, papeleria, materiales de impresion y control basico de bodega."
     >
       <div className="content-grid">
+        <InventoryControlPanel />
+
         <SectionCard
           title="Alertas de stock"
           description="Punto de partida para compras y reservas segun demanda comercial."

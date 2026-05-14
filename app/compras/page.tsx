@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { PurchasePlanner } from "@/components/purchase-planner";
 import { SectionCard } from "@/components/section-card";
 import { StatusPill } from "@/components/status-pill";
 import { purchaseOrderRecords, stockAlerts } from "@/lib/mock-data";
@@ -10,6 +11,8 @@ export default function PurchasesPage() {
       description="Modulo para reponer inventario y abastecer trabajos especiales segun demanda comercial."
     >
       <div className="content-grid">
+        <PurchasePlanner />
+
         <SectionCard
           title="Compras abiertas"
           description="Seguimiento de aprobacion, confirmacion y fecha estimada de llegada."
