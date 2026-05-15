@@ -10,6 +10,12 @@ import {
   useAppState,
 } from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
+import { StatusTransitionButton } from "@/components/status-transition-button";
+import {
+  getNextWorkOrderStatuses,
+  getQuoteStatusTone,
+  getWorkOrderStatusTone,
+} from "@/lib/business-states";
 import { quoteRecords } from "@/lib/mock-data";
 
 const areas = ["Imprenta", "Senaletica", "Gran formato", "Despacho"];
@@ -54,7 +60,14 @@ function buildDefaultEta(daysAhead: number) {
 }
 
 export function WorkOrderStudio() {
-  const { createPurchase, createWorkOrder, purchases, savedQuotes, workOrders } = useAppState();
+  const {
+    createPurchase,
+    createWorkOrder,
+    purchases,
+    savedQuotes,
+    transitionWorkOrderStatus,
+    workOrders,
+  } = useAppState();
   const sharedQuoteSeed = savedQuotes[0]?.number ?? quoteRecords[0].number;
   const [selectedQuote, setSelectedQuote] = useState(sharedQuoteSeed);
   const [area, setArea] = useState("Imprenta");
@@ -106,6 +119,10 @@ export function WorkOrderStudio() {
   const generatedNumber = `OT-${selectedQuote.replace("COT-", "")}`;
 
   function handleCreateWorkOrder() {
+    if (selectedSharedQuote && selectedSharedQuote.status !== "Aprobada") {
+      return;
+    }
+
     const workOrder = createWorkOrder({
       quoteNumber: quote.number,
       customer: quote.customer,
@@ -119,10 +136,22 @@ export function WorkOrderStudio() {
       totalLabel: quote.totalLabel,
     });
 
-    setLastCreated(workOrder.number);
+    if (workOrder) {
+      setLastCreated(workOrder.number);
+      if (workOrder.purchaseNumber) {
+        setLastCreatedPurchase(workOrder.purchaseNumber);
+      }
+    }
   }
 
-  function handleCreatePurchaseFromOrder(order: Pick<StoredWorkOrder, "number" | "purchaseSuggestions">) {
+  function handleCreatePurchaseFromOrder(
+    order: Pick<StoredWorkOrder, "number" | "purchaseNumber" | "purchaseSuggestions">,
+  ) {
+    if (order.purchaseNumber) {
+      setLastCreatedPurchase(order.purchaseNumber);
+      return;
+    }
+
     if (order.purchaseSuggestions.length === 0) {
       return;
     }
@@ -156,7 +185,16 @@ export function WorkOrderStudio() {
               <p className="eyebrow">Handoff a taller</p>
               <h3>Generador de orden de trabajo</h3>
             </div>
-            <StatusPill label="Listo para produccion" tone="info" />
+            <StatusPill
+              label={
+                selectedSharedQuote
+                  ? `COT ${selectedSharedQuote.status}`
+                  : "Referencia historica"
+              }
+              tone={
+                selectedSharedQuote ? getQuoteStatusTone(selectedSharedQuote.status) : "neutral"
+              }
+            />
           </div>
 
           <div className="form-grid">
@@ -250,8 +288,15 @@ export function WorkOrderStudio() {
             >
               {requiresInstallation ? "Incluye instalacion en terreno" : "Sin instalacion"}
             </button>
-            <button className="action-button" onClick={handleCreateWorkOrder} type="button">
-              Crear OT en flujo compartido
+            <button
+              className="action-button"
+              disabled={Boolean(selectedSharedQuote && selectedSharedQuote.status !== "Aprobada")}
+              onClick={handleCreateWorkOrder}
+              type="button"
+            >
+              {selectedSharedQuote && selectedSharedQuote.status !== "Aprobada"
+                ? "Cotizacion debe estar aprobada"
+                : "Crear OT en flujo compartido"}
             </button>
           </div>
         </div>
@@ -436,16 +481,31 @@ export function WorkOrderStudio() {
                   <p>
                     {order.area} · entrega {order.dueDate}
                   </p>
+                  <div className="quote-line-card__signals">
+                    <StatusPill label={order.status} tone={getWorkOrderStatusTone(order.status)} />
+                    {order.purchaseNumber ? (
+                      <StatusPill label={`OC ${order.purchaseNumber}`} tone="info" />
+                    ) : null}
+                  </div>
                   <div className="builder-actions">
+                    {getNextWorkOrderStatuses(order.status).map((status) => (
+                      <StatusTransitionButton
+                        key={status}
+                        label={status}
+                        onClick={() => transitionWorkOrderStatus(order.id, status)}
+                      />
+                    ))}
                     <button
                       className="ghost-button"
-                      disabled={order.purchaseSuggestions.length === 0}
+                      disabled={order.purchaseSuggestions.length === 0 && !order.purchaseNumber}
                       onClick={() => handleCreatePurchaseFromOrder(order)}
                       type="button"
                     >
-                      {order.purchaseSuggestions.length > 0
-                        ? "Crear OC sugerida"
-                        : "Sin compra requerida"}
+                      {order.purchaseNumber
+                        ? `OC ${order.purchaseNumber}`
+                        : order.purchaseSuggestions.length > 0
+                          ? "Crear OC sugerida"
+                          : "Sin compra requerida"}
                     </button>
                   </div>
                 </article>

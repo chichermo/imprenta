@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { IntegrationStatusPanel } from "@/components/integration-status-panel";
 import { SectionCard } from "@/components/section-card";
 import { StatusPill } from "@/components/status-pill";
 import {
@@ -30,6 +31,8 @@ export default function HomePage() {
             </article>
           ))}
         </section>
+
+        <IntegrationStatusPanel />
 
         <div className="content-grid">
           <SectionCard

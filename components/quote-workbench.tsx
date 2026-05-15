@@ -4,10 +4,16 @@ import { useState } from "react";
 
 import {
   formatStoredQuoteTotal,
+  SavedQuote,
   SharedQuoteLine,
   useAppState,
 } from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
+import { StatusTransitionButton } from "@/components/status-transition-button";
+import {
+  getNextQuoteStatuses,
+  getQuoteStatusTone,
+} from "@/lib/business-states";
 import { formatClp, parseClp, parseNumericText, parseStockText } from "@/lib/formatters";
 import { catalogRecords, customerRecords } from "@/lib/mock-data";
 
@@ -77,6 +83,7 @@ export function QuoteWorkbench() {
     removeQuoteLine,
     saveQuoteDraft,
     savedQuotes,
+    transitionQuoteStatus,
     updateQuoteDraft,
     workOrders,
   } = useAppState();
@@ -161,14 +168,12 @@ export function QuoteWorkbench() {
     return lines.some((line) => line.type === "Servicio" || line.type === "Trabajo");
   }
 
-  function handleCreateWorkOrderFromQuote(quote: {
-    number: string;
-    customer: string;
-    total: number;
-    note: string;
-    lines: SharedQuoteLine[];
-  }) {
+  function handleCreateWorkOrderFromQuote(quote: SavedQuote) {
     if (!hasProductionWork(quote.lines)) {
+      return;
+    }
+
+    if (quote.status !== "Aprobada") {
       return;
     }
 
@@ -193,7 +198,9 @@ export function QuoteWorkbench() {
       totalLabel: formatStoredQuoteTotal(quote.total),
     });
 
-    setLastCreatedWorkOrder(workOrder.number);
+    if (workOrder) {
+      setLastCreatedWorkOrder(workOrder.number);
+    }
   }
 
   return (
@@ -576,14 +583,31 @@ export function QuoteWorkbench() {
                   <p>
                     {formatClp(quote.total)} · vence {quote.validUntilLabel}
                   </p>
+                  <div className="quote-line-card__signals">
+                    <StatusPill label={quote.status} tone={getQuoteStatusTone(quote.status)} />
+                    {quote.workOrderNumber ? (
+                      <StatusPill label={`OT ${quote.workOrderNumber}`} tone="success" />
+                    ) : null}
+                  </div>
                   <div className="builder-actions">
+                    {getNextQuoteStatuses(quote.status).map((status) => (
+                      <StatusTransitionButton
+                        key={status}
+                        label={status}
+                        onClick={() => transitionQuoteStatus(quote.id, status)}
+                      />
+                    ))}
                     <button
                       className="ghost-button"
-                      disabled={!hasProductionWork(quote.lines)}
+                      disabled={!hasProductionWork(quote.lines) || quote.status !== "Aprobada"}
                       onClick={() => handleCreateWorkOrderFromQuote(quote)}
                       type="button"
                     >
-                      {hasProductionWork(quote.lines) ? "Crear OT directa" : "Venta directa"}
+                      {quote.status !== "Aprobada"
+                        ? "Aprobar antes de OT"
+                        : hasProductionWork(quote.lines)
+                          ? "Crear OT directa"
+                          : "Venta directa"}
                     </button>
                   </div>
                 </article>

@@ -1,8 +1,8 @@
 import { AppShell } from "@/components/app-shell";
 import { PurchasePlanner } from "@/components/purchase-planner";
+import { PurchaseRegistryTable } from "@/components/purchase-registry-table";
 import { SectionCard } from "@/components/section-card";
-import { StatusPill } from "@/components/status-pill";
-import { purchaseOrderRecords, stockAlerts } from "@/lib/mock-data";
+import { stockAlerts } from "@/lib/mock-data";
 
 export default function PurchasesPage() {
   return (
@@ -15,34 +15,9 @@ export default function PurchasesPage() {
 
         <SectionCard
           title="Compras abiertas"
-          description="Seguimiento de aprobacion, confirmacion y fecha estimada de llegada."
+          description="OC del flujo vivo con recepcion automatica a inventario al marcar Recibida."
         >
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Orden</th>
-                  <th>Proveedor</th>
-                  <th>ETA</th>
-                  <th>Total</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {purchaseOrderRecords.map((purchase) => (
-                  <tr key={purchase.number}>
-                    <td>{purchase.number}</td>
-                    <td>{purchase.supplier}</td>
-                    <td>{purchase.eta}</td>
-                    <td>{purchase.total}</td>
-                    <td>
-                      <StatusPill label={purchase.status} tone={purchase.tone} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PurchaseRegistryTable />
         </SectionCard>
 
         <SectionCard

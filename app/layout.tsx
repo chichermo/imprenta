@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   title: "Distribuidora San Pablo S.A.",
   description:
     "Sistema comercial para cotizaciones, ventas, inventario y futura facturacion electronica en Chile.",
+  applicationName: "San Pablo ERP",
+  appleWebApp: {
+    capable: true,
+    title: "San Pablo",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
     icon: "/favicon.ico",
   },

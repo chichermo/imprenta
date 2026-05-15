@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell";
+import { QuoteRegistryTable } from "@/components/quote-registry-table";
 import { QuoteWorkbench } from "@/components/quote-workbench";
 import { SectionCard } from "@/components/section-card";
-import { StatusPill } from "@/components/status-pill";
 import { quoteRecords, quoteTemplateChecklist } from "@/lib/mock-data";
 
 const quoteCapabilities = [
@@ -48,36 +48,9 @@ export default function QuotesPage() {
 
         <SectionCard
           title="Bandeja comercial"
-          description="Vista sugerida para seguimiento diario del equipo de ventas."
+          description="Cotizaciones del flujo vivo y referencias historicas en un solo listado."
         >
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Numero</th>
-                  <th>Cliente</th>
-                  <th>Detalle</th>
-                  <th>Validez</th>
-                  <th>Total</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {quoteRecords.map((quote) => (
-                  <tr key={quote.number}>
-                    <td>{quote.number}</td>
-                    <td>{quote.customer}</td>
-                    <td>{quote.summary}</td>
-                    <td>{quote.validUntil}</td>
-                    <td>{quote.total}</td>
-                    <td>
-                      <StatusPill label={quote.status} tone={quote.tone} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <QuoteRegistryTable />
         </SectionCard>
 
         <SectionCard

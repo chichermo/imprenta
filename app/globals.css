@@ -1529,3 +1529,61 @@ textarea {
     align-items: flex-start;
   }
 }
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.table-subtle {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.ghost-button--compact,
+.action-button--compact {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.integration-status-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.integration-status-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  clip-path: var(--cut-md);
+  background:
+    linear-gradient(135deg, rgba(41, 183, 176, 0.08), transparent 55%),
+    var(--paper);
+  border: 1px solid var(--border-paper);
+  box-shadow: var(--shadow-paper);
+}
+
+.integration-status-card strong {
+  font-size: 1.05rem;
+}
+
+.integration-status-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 1280px) {
+  .integration-status-panel {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,8 +1,8 @@
 import { AppShell } from "@/components/app-shell";
 import { SectionCard } from "@/components/section-card";
-import { StatusPill } from "@/components/status-pill";
+import { WorkOrderRegistryTable } from "@/components/work-order-registry-table";
 import { WorkOrderStudio } from "@/components/work-order-studio";
-import { workOrderRecords, workStages } from "@/lib/mock-data";
+import { workStages } from "@/lib/mock-data";
 
 export default function WorkOrdersPage() {
   return (
@@ -15,36 +15,9 @@ export default function WorkOrdersPage() {
 
         <SectionCard
           title="Cola de produccion"
-          description="Idealmente esta vista se alimentara desde cotizaciones aprobadas."
+          description="Ordenes del flujo compartido con avance de estado y handoff a compras e inventario."
         >
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Orden</th>
-                  <th>Cliente</th>
-                  <th>Area</th>
-                  <th>Resumen</th>
-                  <th>Entrega</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrderRecords.map((order) => (
-                  <tr key={order.number}>
-                    <td>{order.number}</td>
-                    <td>{order.customer}</td>
-                    <td>{order.area}</td>
-                    <td>{order.summary}</td>
-                    <td>{order.deliveryDate}</td>
-                    <td>
-                      <StatusPill label={order.status} tone={order.tone} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <WorkOrderRegistryTable />
         </SectionCard>
 
         <SectionCard

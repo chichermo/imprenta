@@ -9,13 +9,24 @@ import {
   useAppState,
 } from "@/components/app-state-provider";
 import { StatusPill } from "@/components/status-pill";
+import { StatusTransitionButton } from "@/components/status-transition-button";
+import {
+  getNextPurchaseStatuses,
+  getPurchaseStatusTone,
+} from "@/lib/business-states";
 import { formatClp, parseClp, parseNumericText } from "@/lib/formatters";
 import { catalogRecords, supplierRecords, stockAlerts } from "@/lib/mock-data";
 
 const lineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function PurchasePlanner() {
-  const { createPurchase, purchases, savedQuotes, workOrders } = useAppState();
+  const {
+    createPurchase,
+    purchases,
+    savedQuotes,
+    transitionPurchaseStatus,
+    workOrders,
+  } = useAppState();
   const [supplier, setSupplier] = useState(supplierRecords[0].name);
   const [item, setItem] = useState(catalogRecords[1].name);
   const [quantity, setQuantity] = useState("12");
@@ -161,12 +172,13 @@ export function PurchasePlanner() {
     setPurpose(primarySuggestion.reason);
   }
 
-  function handleCreatePurchase() {
+  function handleCreatePurchase(autoSubmit = false) {
     const purchase = createPurchase({
       supplier,
       eta,
       sourceReference,
       lines,
+      autoSubmit,
     });
 
     if (purchase) {
@@ -187,7 +199,7 @@ export function PurchasePlanner() {
               <p className="eyebrow">Abastecimiento</p>
               <h3>Planificador de compra</h3>
             </div>
-            <StatusPill label="Borrador OC" tone="warning" />
+            <StatusPill label="OC en armado" tone="warning" />
           </div>
 
           <div className="form-grid">
@@ -295,8 +307,11 @@ export function PurchasePlanner() {
             >
               Reemplazar por sugeridas
             </button>
-            <button className="ghost-button" onClick={handleCreatePurchase} type="button">
-              Guardar OC compartida
+            <button className="ghost-button" onClick={() => handleCreatePurchase(false)} type="button">
+              Guardar borrador OC
+            </button>
+            <button className="action-button" onClick={() => handleCreatePurchase(true)} type="button">
+              Enviar a aprobacion
             </button>
           </div>
         </div>
@@ -484,6 +499,19 @@ export function PurchasePlanner() {
                   <p>
                     {formatClp(purchase.total)} · ETA {purchase.eta}
                   </p>
+                  <div className="quote-line-card__signals">
+                    <StatusPill label={purchase.status} tone={getPurchaseStatusTone(purchase.status)} />
+                    <StatusPill label={`Origen ${purchase.sourceReference}`} tone="neutral" />
+                  </div>
+                  <div className="builder-actions">
+                    {getNextPurchaseStatuses(purchase.status).map((status) => (
+                      <StatusTransitionButton
+                        key={status}
+                        label={status}
+                        onClick={() => transitionPurchaseStatus(purchase.id, status)}
+                      />
+                    ))}
+                  </div>
                 </article>
               ))
             )}
