@@ -141,6 +141,9 @@ export function ReportingDashboard() {
           </label>
 
           <div className="report-toolbar__actions">
+            <a className="ghost-button" href="#report-charts">
+              Ir a graficos
+            </a>
             <button
               className="ghost-button"
               disabled={isExporting !== null}
@@ -159,6 +162,15 @@ export function ReportingDashboard() {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="report-graphs-intro" id="report-charts">
+        <p className="eyebrow">Graficos principales</p>
+        <h3>Visualizaciones del periodo</h3>
+        <p>
+          Aqui empiezan los graficos del sistema. Primero veras ventas vs costos y luego el resto
+          de paneles operativos y comerciales.
+        </p>
       </section>
 
       <section className="mini-stat-grid">
